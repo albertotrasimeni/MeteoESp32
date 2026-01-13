@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Impostazioni Dashboard Meteo</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 15px;
+            background: #0f172a; /* Allineato al tema scuro della dashboard */
+            color: white;
+            margin: 0;
+        }
+
+        .settings-card {
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            max-width: 500px;
+            margin: 10px auto;
+            border: 1px solid #334155;
+        }
+
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 0; /* Leggermente più alto per il touch */
+            border-bottom: 1px solid #334155;
+        }
+
+        .setting-row:last-child {
+            border-bottom: none;
+        }
+
+        h2, h3 {
+            color: #38bdf8;
+            margin-top: 0;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 54px;
+            height: 28px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #475569;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked+.slider {
+            background-color: #10b981;
+        }
+
+        input:checked+.slider:before {
+            transform: translateX(26px);
+        }
+
+        .btn-save {
+            width: 100%;
+            padding: 15px;
+            background: #0ea5e9;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 25px;
+            transition: 0.3s;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-save:hover {
+            background: #0284c7;
+        }
+
+        .back-link {
+            display: block;
+            text-align: center;
+            margin-top: 20px;
+            text-decoration: none;
+            color: #94a3b8;
+            font-size: 14px;
+            padding: 10px;
+        }
+
+        /* Ottimizzazione Select per Mobile */
+        select {
+            padding: 8px;
+            border-radius: 8px;
+            background: #0f172a;
+            color: white;
+            border: 1px solid #334155;
+            font-size: 14px;
+            max-width: 150px;
+        }
+
+        hr {
+            border: 0;
+            border-top: 1px solid #334155;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="settings-card">
+        <h2><i class="fas fa-cog"></i> Impostazioni</h2>
+
+        <div class="setting-row">
+            <span>Aggiornamento Dati</span>
+            <select id="intervalSelect">
+                <option value="15000" selected>15 sec (Default)</option>
+                <option value="30000">30 sec</option>
+                <option value="60000">1 min</option>
+                <option value="300000">5 min</option>
+                <option value="600000">10 min</option>
+                <option value="1800000">30 min</option>
+                <option value="3600000">1 ora</option>
+                <option value="7200000">2 ore</option>
+                <option value="14400000">4 ore</option>
+            </select>
+        </div>
+
+        <hr>
+        <h3>Visibilità Sensori</h3>
+        <div id="switches-container">
+            </div>
+
+        <button type="button" class="btn-save" onclick="saveSettings()">SALVA IMPOSTAZIONI</button>
+
+        <a href="index.html" class="back-link"><i class="fas fa-arrow-left"></i> Torna alla Dashboard</a>
+    </div>
+
+    <script>
+        const sensors = ['temp', 'hum', 'press_mb', 'iaq', 'co2', 'pm25', 'uv', 'wind', 'gps'];
+        const labels = {
+            temp: 'Temperatura', hum: 'Umidità', press_mb: 'Pressione',
+            iaq: 'Qualità Aria (IAQ)', co2: 'CO2', pm25: 'PM2.5',
+            uv: 'Indice UV', wind: 'Vento', gps: 'GPS'
+        };
+
+        function initSwitches() {
+            const container = document.getElementById('switches-container');
+            if (!container) return;
+            container.innerHTML = '';
+
+            sensors.forEach(s => {
+                const saved = localStorage.getItem('show_' + s);
+                const isChecked = (saved !== 'false');
+
+                const row = document.createElement('div');
+                row.className = 'setting-row';
+                row.innerHTML = `
+                <span>${labels[s]}</span>
+                <label class="switch">
+                    <input type="checkbox" id="check_${s}" ${isChecked ? 'checked' : ''}>
+                    <span class="slider"></span>
+                </label>
+            `;
+                container.appendChild(row);
+            });
+
+            const intervalEl = document.getElementById('intervalSelect');
+            if (intervalEl) {
+                intervalEl.value = localStorage.getItem('updateInterval') || '20000';
+            }
+        }
+
+        function saveSettings() {
+            sensors.forEach(s => {
+                const checkbox = document.getElementById('check_' + s);
+                if (checkbox) {
+                    const stato = checkbox.checked ? 'true' : 'false';
+                    localStorage.setItem('show_' + s, stato);
+                }
+            });
+
+            const intervalEl = document.getElementById('intervalSelect');
+            if (intervalEl) {
+                localStorage.setItem('updateInterval', intervalEl.value);
+            }
+
+            alert("Impostazioni salvate!");
+            window.location.href = 'index.html';
+        }
+
+        document.addEventListener('DOMContentLoaded', initSwitches);
+    </script>
+</body>
+
+</html>

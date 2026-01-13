@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Meteo ESP32 - Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+    <div class="top-bar">
+        <div class="top-bar-inner">
+            <div class="menu-btn" onclick="toggleMenu()"><i class="fas fa-bars"></i></div>
+            <div class="logo">
+                <div class="logo-text">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span class="app-title">STAZIONE METEO ESP32</span>
+                        <div class="wifi-status-container">
+                            <div id="wifi-led" class="led"></div>
+                            <span class="wifi-label">Stato Wifi</span>
+                        </div>
+                    </div>
+                    <span class="app-sub-mini">Ing. <b>Trasimeni</b></span>
+                </div>
+            </div>
+            <div class="time-box">
+                <div id="clock">00:00:00</div>
+                <div id="date">--/--/----</div>
+            </div>
+        </div>
+    </div>
+
+    <nav class="side-menu" id="sideMenu">
+        <div class="menu-header">STAMPA STORICO</div>
+
+        <a href="#" onclick="avviaStampa('temp');"><i class="fas fa-thermometer-half" style="color:#ef4444"></i>
+            Temperatura</a>
+        <a href="#" onclick="avviaStampa('hum');"><i class="fas fa-droplet" style="color:#3b82f6"></i> Umidità</a>
+        <a href="#" onclick="avviaStampa('press_mb');"><i class="fas fa-gauge-high" style="color:#f59e0b"></i>
+            Pressione</a>
+        <a href="#" onclick="avviaStampa('iaq');"><i class="fas fa-leaf" style="color:#10b981"></i> Qualità Aria
+            (IAQ)</a>
+        <a href="#" onclick="avviaStampa('co2');"><i class="fas fa-cloud" style="color:#a855f7"></i> CO2</a>
+        <a href="#" onclick="avviaStampa('pm25');"><i class="fas fa-smog" style="color:#64748b"></i> PM 2.5</a>
+        <a href="#" onclick="avviaStampa('uv');"><i class="fas fa-sun" style="color:#fbbf24"></i> Indice UV</a>
+        <a href="#" onclick="avviaStampa('wind');"><i class="fas fa-wind" style="color:#0ea5e9"></i> Vento</a>
+        <a href="#" onclick="esportaCSV();"
+            style="background: rgba(16, 185, 129, 0.1); border-radius: 8px; margin-top: 5px;">
+            <i class="fas fa-file-csv" style="color:#10b981"></i> <b>Esporta Dati CSV</b>
+        </a>
+        <hr style="border:0; border-top:1px solid #334155; margin:15px 0;">
+        <div class="menu-header">CONFIGURAZIONE</div>
+        <a href="settings.html"><i class="fas fa-cog" style="color:#38bdf8"></i> Impostazioni Sensori</a>
+        <div class="menu-header">SISTEMA</div>
+        <a href="#" onclick="toggleMenu(); location.reload();"><i class="fas fa-sync"></i> Aggiorna Dashboard</a>
+    </nav>
+    <div class="main-container">
+        <div class="grid-container">
+            <div class="card" id="block-temp">
+                <div class="card-header"><i class="fas fa-thermometer-half" style="color:#ef4444"></i> Temperatura</div>
+                <div class="gauge-container"><canvas id="gaugeTemp"></canvas></div>
+                <div class="value" id="tempValue">-- °C</div>
+                <div class="mini-chart"><canvas id="miniTemp"></canvas></div>
+            </div>
+
+            <div class="card" id="block-hum">
+                <div class="card-header"><i class="fas fa-droplet" style="color:#3b82f6"></i> Umidità</div>
+                <div class="gauge-container"><canvas id="gaugeHum"></canvas></div>
+                <div class="value" id="humValue">-- %</div>
+                <div class="mini-chart"><canvas id="miniHum"></canvas></div>
+            </div>
+
+            <div class="card" id="block-press_mb">
+                <div class="card-header"><i class="fas fa-gauge-high" style="color:#f59e0b"></i> Pressione</div>
+                <div class="gauge-container"><canvas id="gaugePress"></canvas></div>
+                <div class="value" id="pressValue">-- hPa</div>
+                <div class="mini-chart"><canvas id="miniPress"></canvas></div>
+            </div>
+
+            <div class="card" id="block-iaq">
+                <div class="card-header"><i class="fas fa-wind" id="iaqIcon"></i> Qualità Aria</div>
+                <div class="value-large" id="iaqValue">-- IAQ</div>
+                <div class="mini-chart"><canvas id="miniIaq"></canvas></div>
+            </div>
+
+            <div class="card" id="block-co2">
+                <div class="card-header"><i class="fas fa-cloud" style="color:#a855f7"></i> CO2</div>
+                <div class="value-large" id="co2Value">-- ppm</div>
+                <div class="mini-chart"><canvas id="miniCo2"></canvas></div>
+            </div>
+
+            <div class="card" id="block-pm25">
+                <div class="card-header"><i class="fas fa-smog" style="color:#64748b"></i> PM 2.5</div>
+                <div class="value-large" id="pm25Value">-- µg/m³</div>
+                <div class="mini-chart"><canvas id="miniPm25"></canvas></div>
+            </div>
+
+            <div class="card" id="block-uv">
+                <div class="card-header"><i class="fas fa-sun" style="color:#fbbf24"></i> Indice UV</div>
+                <div class="value-large" id="uvValue">-- Index</div>
+                <div class="mini-chart"><canvas id="miniUv"></canvas></div>
+            </div>
+
+            <div class="card" id="block-wind">
+                <div class="card-header"><i class="fas fa-wind" style="color:#0ea5e9"></i> Vento</div>
+                <div class="value-large" id="windValue">-- km/h</div>
+                <div class="mini-chart"><canvas id="miniWind"></canvas></div>
+            </div>
+
+            <div class="card" id="block-gps">
+                <div class="card-header"><i class="fas fa-location-dot" style="color:#38bdf8"></i> Posizione GPS</div>
+                <div class="gps-container"
+                    style="text-align:center; flex:1; display:flex; flex-direction:column; justify-content:center; padding:10px;">
+                    <div id="localitaNome"
+                        style="color:#38bdf8; font-size:1.4rem; font-weight:bold; margin-bottom:5px;">Cannara (PG)</div>
+                    <div id="gpsCoordinate"
+                        style="font-size:0.85rem; color:#f8fafc; margin-bottom:4px; line-height:1.2;">--° --′ --″
+                        N<br>--° --′ --″ E</div>
+                    <div id="gpsRaw" style="font-size:0.75rem; color:#94a3b8; opacity:0.7; margin-top:5px;">LAT: -- |
+                        LON: --</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="chartModal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal()">&times;</span>
+            <h2 id="modalTitle" style="color:white; text-align:center;"></h2>
+
+            <div id="modalCoords" style="color:white; text-align:center; font-size:14px; margin-bottom:10px;"></div>
+
+            <div class="chart-container" style="position:relative; height:400px;">
+                <canvas id="bigChartCanvas"></canvas>
+            </div>
+
+            <div style="text-align:center; margin-top:20px;" class="no-print">
+                <button onclick="eseguiStampaEffettiva()" style="background:#38bdf8; color:white; border:none; padding:12px 25px; border-radius:8px; cursor:pointer; font-weight:bold; font-size:16px;">
+                    <i class="fas fa-print"></i> STAMPA REPORT
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
