@@ -349,7 +349,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initCharts();
     caricaPreferenzeUtente();
     await fetchSensorData();
-    setInterval(async () => { await fetchSensorData(); }, 15000);
+    setInterval(async () => { await fetchSensorData(); }, 1000);
 });
 
 function closeModal() { q('chartModal').style.display = 'none'; }
