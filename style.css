@@ -42,7 +42,7 @@ body {
     align-items: center;
 }
 
-/* STILE LED WIFI */
+/* STILE LED WIFI E DINAMICI */
 .wifi-status-container {
     display: flex;
     align-items: center;
@@ -59,6 +59,7 @@ body {
     border-radius: 50%;
     background-color: #64748b; /* Colore base grigio */
     transition: 0.3s;
+    flex-shrink: 0; /* IMPEDISCE AL LED DI SCHIACCIARSI */
 }
 
 .led-online {
@@ -111,11 +112,16 @@ body {
     justify-content: space-between;
 }
 
+/* HEADER CON SUPPORTO LED */
 .card-header {
     font-size: 0.8rem;
     font-weight: bold;
     text-transform: uppercase;
     color: var(--text-dim);
+    display: flex; /* ALLINEA TITOLO E LED */
+    justify-content: space-between; /* TESTO A SX, LED A DX */
+    align-items: center;
+    width: 100%;
 }
 
 .gauge-container {
@@ -215,92 +221,44 @@ body {
 
 @media (max-width: 600px) {
     .grid-container { grid-template-columns: 1fr; }
-    .wifi-status-container { display: none; } /* Opzionale: nasconde il led su schermi piccolissimi */
+    .wifi-status-container { display: none; }
 }
 
-/* --- SEZIONE STAMPA (PULITA) --- */
+/* --- SEZIONE STAMPA --- */
 @media print {
-    @page {
-        size: portrait;
-        margin: 1.5cm;
-    }
-
-    body > *:not(#chartModal) {
-        display: none !important;
-    }
-
-    body {
-        background: white !important;
-        padding: 0;
-        margin: 0;
-    }
-
-    #chartModal {
-        display: block !important;
-        position: relative !important;
-        visibility: visible !important;
-        background: white !important;
-        width: 100% !important;
-        border: none !important;
-        box-shadow: none !important;
-    }
-
-    .modal-content {
-        background: white !important;
-        border: none !important;
-        width: 100% !important;
-        padding: 0 !important;
-    }
-
-    #bigChartCanvas, .close-btn, .no-print, button {
-        display: none !important;
-    }
-
-    #printImg {
-        display: block !important;
-        visibility: visible !important;
-        width: 100% !important;
-        height: auto !important;
-        margin: 20px auto;
-    }
-
-    #modalTitle, #modalCoords {
-        color: black !important;
-        display: block !important;
-        visibility: visible !important;
-        text-align: center !important;
-        font-family: Arial, sans-serif;
-    }
-
+    @page { size: portrait; margin: 1.5cm; }
+    body > *:not(#chartModal) { display: none !important; }
+    body { background: white !important; padding: 0; margin: 0; }
+    #chartModal { display: block !important; position: relative !important; visibility: visible !important; background: white !important; width: 100% !important; border: none !important; }
+    .modal-content { background: white !important; border: none !important; width: 100% !important; padding: 0 !important; }
+    #bigChartCanvas, .close-btn, .no-print, button { display: none !important; }
+    #printImg { display: block !important; visibility: visible !important; width: 100% !important; height: auto !important; margin: 20px auto; }
+    #modalTitle, #modalCoords { color: black !important; display: block !important; visibility: visible !important; text-align: center !important; }
     #modalTitle { font-size: 24pt; margin-bottom: 10px; }
     #modalCoords { font-size: 14pt; margin-bottom: 20px; }
 }
-/* --- OTTIMIZZAZIONE RESPONSIVE EXTRA (Senza modifiche strutturali) --- */
 
 /* --- OTTIMIZZAZIONE CONSERVATIVA (MANTENIMENTO GRIGLIA 3x3) --- */
-
 @media (max-width: 1100px) {
-    /* Per Tablet e Smartphone: invece di spostare i blocchi, 
-       riduciamo la dimensione generale per mantenere la vista 3x3 */
     .grid-container {
-        grid-template-columns: repeat(3, 1fr) !important; /* Forza la griglia 3x3 */
-        gap: 8px !important; /* Riduce lo spazio tra i blocchi per guadagnare spazio */
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 8px !important;
         padding: 5px !important;
         width: 100% !important;
         max-width: none !important;
     }
 
     .card {
-        height: 220px !important; /* Riduce l'altezza per evitare scroll eccessivi */
+        height: 220px !important;
         padding: 8px !important;
     }
 
     .card-header {
-        font-size: 0.65rem !important; /* Testi più piccoli per stare nei blocchi */
+        font-size: 0.65rem !important;
     }
 
     .value-large {
-        font-size: 1.1rem !important; /* Adatta i valori grandi alla nuova scala */
+        font-size: 1.1rem !important;
     }
 
     .value {
@@ -315,7 +273,6 @@ body {
         font-size: 0.65rem !important;
     }
 
-    /* Ottimizzazione Top Bar per schermi piccoli */
     .app-title {
         font-size: 12px !important;
     }
@@ -328,18 +285,17 @@ body {
         font-size: 9px !important;
     }
 
-    /* Modal (Grafico) adattivo */
     .modal-content {
         width: 98% !important;
         padding: 10px !important;
     }
 
     .chart-container {
-        height: 300px !important; /* Riduce l'altezza del grafico per farlo stare nello schermo */
+        height: 300px !important;
     }
 }
 
-/* Fix specifico per smartphone molto stretti (es. iPhone SE) */
+/* Fix specifico per smartphone molto stretti */
 @media (max-width: 400px) {
     .grid-container {
         gap: 4px !important;

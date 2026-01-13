@@ -22,36 +22,69 @@ const sensorCfg = {
     wind: { id: 'Wind', c: '#0ea5e9', u: 'km/h', targetId: 'windValue' }
 };
 
-// --- GAUGE OTTIMIZZATO PER GRIGLIA 3x3 (Smartphone/Tablet) ---
+// --- LOGICA COLORI QUALITÀ ARIA ---
+function getAQIColor(tipo, val) {
+    if (tipo === 'iaq') {
+        return val <= 50 ? '#10b981' : (val <= 100 ? '#f59e0b' : '#ef4444');
+    }
+    if (tipo === 'co2') {
+        return val <= 800 ? '#10b981' : (val <= 1200 ? '#f59e0b' : '#ef4444');
+    }
+    if (tipo === 'pm25') {
+        return val <= 25 ? '#10b981' : (val <= 50 ? '#f59e0b' : '#ef4444');
+    }
+    return '#10b981'; // Default verde se online
+}
+
+// --- FUNZIONE AGGIORNATA PER LED DINAMICI ---
+function updateStatusLEDs(status, data = null) {
+    const basicLeds = { 'led-temp': 'online', 'led-hum': 'online', 'led-press': 'online' };
+    
+    // Aggiorna LED base (Verde se online)
+    Object.keys(basicLeds).forEach(id => {
+        const el = q(id);
+        if (el) el.className = 'led ' + (status === 'online' ? 'led-online' : 'led-offline');
+    });
+
+    // Aggiorna LED Intelligenti (IAQ, CO2, PM2.5) solo se abbiamo i dati
+    if (status === 'online' && data) {
+        const smartSensors = ['iaq', 'co2', 'pm25'];
+        smartSensors.forEach(s => {
+            const el = q('led-' + s);
+            if (el) {
+                const color = getAQIColor(s, parseFloat(data[s]));
+                el.style.backgroundColor = color;
+                el.style.boxShadow = `0 0 8px ${color}`;
+            }
+        });
+    } else if (status === 'offline') {
+        ['led-iaq', 'led-co2', 'led-pm25'].forEach(id => {
+            const el = q(id);
+            if (el) { el.className = 'led led-offline'; el.style.boxShadow = ''; }
+        });
+    }
+}
+
+// --- GAUGE OTTIMIZZATO PER GRIGLIA 3x3 ---
 function drawGauge(canvasId, val, cfg) {
     const canvas = q(canvasId); if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    
-    // Rilevamento dinamico dimensioni contenitore per non rompere la griglia
     const rect = canvas.parentElement.getBoundingClientRect();
     const w = rect.width;
     const h = rect.height || 120;
-    
     canvas.width = w * window.devicePixelRatio;
     canvas.height = h * window.devicePixelRatio;
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
     ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-    
     const cx = w / 2;
     const cy = h * 0.85;
-    
-    // Raggio proporzionale alla larghezza del blocco
     const r = Math.min(w, h) * 0.48; 
-
     ctx.clearRect(0, 0, w, h);
     ctx.strokeStyle = '#ffffff'; ctx.fillStyle = '#ffffff'; 
-    
-    // Font adattivo per blocchi piccoli
     const fontSize = w < 130 ? 8 : 10;
     ctx.font = `bold ${fontSize}px Arial`; 
     ctx.textAlign = 'center';
-
     for (let i = 0; i <= 10; i++) {
         const angle = Math.PI + (Math.PI * (i / 10));
         const v = cfg.min + (i * (cfg.max - cfg.min) / 10);
@@ -59,24 +92,16 @@ function drawGauge(canvasId, val, cfg) {
         ctx.moveTo(cx + Math.cos(angle) * r, cy + Math.sin(angle) * r);
         ctx.lineTo(cx + Math.cos(angle) * (r + 6), cy + Math.sin(angle) * (r + 6));
         ctx.stroke();
-        
-        // Disegna i numeri solo se c'è spazio sufficiente nel blocco
         if (w > 100) {
             const txtR = r + 16;
             ctx.fillText(v.toFixed(0), cx + Math.cos(angle) * txtR, cy + Math.sin(angle) * txtR);
         }
     }
-
-    // Arco base
     ctx.beginPath(); ctx.arc(cx, cy, r, Math.PI, Math.PI * 2);
     ctx.strokeStyle = '#2d3748'; ctx.lineWidth = w < 130 ? 10 : 16; ctx.stroke();
-    
-    // Arco valore (Progress)
     const p = (Math.min(Math.max(val, cfg.min), cfg.max) - cfg.min) / (cfg.max - cfg.min);
     ctx.beginPath(); ctx.arc(cx, cy, r, Math.PI, Math.PI + (Math.PI * p));
     ctx.strokeStyle = cfg.c; ctx.lineWidth = w < 130 ? 10 : 16; ctx.stroke();
-    
-    // Lancetta
     const na = Math.PI + (Math.PI * p);
     ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.lineCap = 'round';
     ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(na) * (r + 2), cy + Math.sin(na) * (r + 2)); ctx.stroke();
@@ -126,7 +151,6 @@ function eseguiStampaEffettiva() {
     bigChart.options.scales.y.ticks.color = '#000000';
     bigChart.options.plugins.legend.labels.color = '#000000';
     bigChart.update('none');
-
     setTimeout(() => {
         const imgData = bigChart.toBase64Image();
         let pImg = q('printImg');
@@ -138,14 +162,8 @@ function eseguiStampaEffettiva() {
         pImg.src = imgData;
         pImg.style.display = 'block';
         q('bigChartCanvas').style.visibility = 'hidden';
-
-        if (q('modalCoords')) {
-            q('modalCoords').innerText = coordsAttuali;
-            q('modalCoords').style.color = 'black';
-        }
-
+        if (q('modalCoords')) { q('modalCoords').innerText = coordsAttuali; q('modalCoords').style.color = 'black'; }
         window.print();
-
         setTimeout(() => {
             if (pImg) pImg.style.display = 'none';
             q('bigChartCanvas').style.visibility = 'visible';
@@ -166,26 +184,19 @@ async function fetchSensorData() {
         if (!response.ok) throw new Error('Network response was not ok');
         const tsData = await response.json();
 
-        if (wifiLed) wifiLed.className = 'led led-online';
-
         const data = {
-            temp: tsData.field1,
-            hum: tsData.field2,
-            press_mb: tsData.field3,
-            iaq: tsData.field4,
-            co2: tsData.field5,
-            pm25: tsData.field6,
-            uv: tsData.field7,
-            wind: tsData.field8,
-            lat: "43.0125", 
-            lon: "12.5852",
-            localita: "Cannara (PG)",
+            temp: tsData.field1, hum: tsData.field2, press_mb: tsData.field3,
+            iaq: tsData.field4, co2: tsData.field5, pm25: tsData.field6,
+            uv: tsData.field7, wind: tsData.field8,
+            lat: "43.0125", lon: "12.5852", localita: "Cannara (PG)",
             ora: new Date().toLocaleTimeString('it-IT'),
             data: new Date(tsData.created_at).toLocaleDateString('it-IT')
         };
 
-        coordsAttuali = `LAT: ${data.lat} | LON: ${data.lon}`;
+        if (wifiLed) wifiLed.className = 'led led-online';
+        updateStatusLEDs('online', data); // Passiamo i dati per i colori IAQ/CO2/PM
 
+        coordsAttuali = `LAT: ${data.lat} | LON: ${data.lon}`;
         if (q('clock')) q('clock').innerText = data.ora;
         if (q('date')) q('date').innerText = data.data;
         if (q('localitaNome')) q('localitaNome').innerText = data.localita;
@@ -194,12 +205,8 @@ async function fetchSensorData() {
 
         const oraAttuale = Date.now();
         const intervallo = getSavedInterval();
-
         let deveAggiornare = false;
-        if (oraAttuale - lastChartUpdate >= intervallo) {
-            deveAggiornare = true;
-            lastChartUpdate = oraAttuale;
-        }
+        if (oraAttuale - lastChartUpdate >= intervallo) { deveAggiornare = true; lastChartUpdate = oraAttuale; }
 
         Object.keys(sensorCfg).forEach(key => {
             const val = parseFloat(data[key]);
@@ -216,13 +223,14 @@ async function fetchSensorData() {
                 }
             }
             if (key === 'iaq' && q('iaqIcon')) {
-                let col = val <= 50 ? '#10b981' : (val <= 100 ? '#f59e0b' : '#ef4444');
+                let col = getAQIColor('iaq', val);
                 q('iaqIcon').style.setProperty('color', col, 'important');
             }
         });
     } catch (e) { 
         console.error("Errore Fetch:", e); 
         if (wifiLed) wifiLed.className = 'led led-offline';
+        updateStatusLEDs('offline');
     }
 }
 
@@ -247,9 +255,7 @@ function esportaCSV() {
     let csvContent = "sep=,\nOra," + sensoriPresenti.map(key => sensorCfg[key].id).join(",") + "\n";
     Object.keys(righeDati).forEach(ora => {
         let riga = [ora];
-        sensoriPresenti.forEach(key => {
-            riga.push(righeDati[ora][key] || "");
-        });
+        sensoriPresenti.forEach(key => { riga.push(righeDati[ora][key] || ""); });
         csvContent += riga.join(",") + "\n";
     });
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -286,7 +292,6 @@ function caricaPreferenzeUtente() {
     });
 }
 
-// Fix per ridisegnare i gauge al cambio di orientamento dello smartphone
 window.addEventListener('resize', () => {
     Object.keys(sensorCfg).forEach(key => {
         const cfg = sensorCfg[key];
