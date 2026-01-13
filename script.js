@@ -22,49 +22,86 @@ const sensorCfg = {
     wind: { id: 'Wind', c: '#0ea5e9', u: 'km/h', targetId: 'windValue' }
 };
 
-// --- LOGICA COLORI QUALITÀ ARIA ---
-function getAQIColor(tipo, val) {
+// --- LOGICA COLORI E TESTI QUALITÀ ARIA ---
+function getAQIInfo(tipo, val) {
     if (tipo === 'iaq') {
-        return val <= 50 ? '#10b981' : (val <= 100 ? '#f59e0b' : '#ef4444');
+        if (val <= 50) return { c: '#10b981', t: 'OTTIMA' };
+        if (val <= 100) return { c: '#f59e0b', t: 'MEDIOCRE' };
+        return { c: '#ef4444', t: 'RISCHIO' };
     }
     if (tipo === 'co2') {
-        return val <= 800 ? '#10b981' : (val <= 1200 ? '#f59e0b' : '#ef4444');
+        if (val <= 800) return { c: '#10b981', t: 'ECCELLENTE' };
+        if (val <= 1200) return { c: '#f59e0b', t: 'ATTENZIONE' };
+        return { c: '#ef4444', t: 'ALTA' };
     }
     if (tipo === 'pm25') {
-        return val <= 25 ? '#10b981' : (val <= 50 ? '#f59e0b' : '#ef4444');
+        if (val <= 25) return { c: '#10b981', t: 'BUONA' };
+        if (val <= 50) return { c: '#f59e0b', t: 'MODERATA' };
+        return { c: '#ef4444', t: 'ALTA' };
     }
-    return '#10b981'; // Default verde se online
+
+    if (tipo === 'uv') {
+        if (val <= 2) return { c: '#10b981', t: 'BASSO' };
+        if (val <= 5) return { c: '#f59e0b', t: 'MODERATO' };
+        if (val <= 7) return { c: '#f97316', t: 'ALTO' }; // Arancione
+        return { c: '#ef4444', t: 'ESTREMO' };
+    }
+
+    if (tipo === 'wind') {
+        if (val <= 19) return { c: '#10b981', t: 'BREZZA' };
+        if (val <= 38) return { c: '#f59e0b', t: 'MODERATO' };
+        return { c: '#ef4444', t: 'FORTE' };
+    }
+
+    return { c: '#10b981', t: '--' };
 }
 
-// --- FUNZIONE AGGIORNATA PER LED DINAMICI ---
+// --- FUNZIONE AGGIORNATA PER LED E TESTI DINAMICI ---
 function updateStatusLEDs(status, data = null) {
+    // 1. LED BASE (Semplice Online/Offline)
     const basicLeds = { 'led-temp': 'online', 'led-hum': 'online', 'led-press': 'online' };
-    
-    // Aggiorna LED base (Verde se online)
+
     Object.keys(basicLeds).forEach(id => {
         const el = q(id);
         if (el) el.className = 'led ' + (status === 'online' ? 'led-online' : 'led-offline');
     });
 
-    // Aggiorna LED Intelligenti (IAQ, CO2, PM2.5) solo se abbiamo i dati
+    // 2. LED DINAMICI (Cambiata qui: aggiunti 'uv' e 'wind')
+    const smartSensors = ['iaq', 'co2', 'pm25', 'uv', 'wind'];
+
     if (status === 'online' && data) {
-        const smartSensors = ['iaq', 'co2', 'pm25'];
         smartSensors.forEach(s => {
-            const el = q('led-' + s);
-            if (el) {
-                const color = getAQIColor(s, parseFloat(data[s]));
-                el.style.backgroundColor = color;
-                el.style.boxShadow = `0 0 8px ${color}`;
+            const elLed = q('led-' + s);
+            const elLabel = q('label-' + s);
+
+            // Assicurati che data[s] esista prima di calcolare
+            const val = data[s] !== undefined ? parseFloat(data[s]) : 0;
+            const info = getAQIInfo(s, val);
+
+            if (elLed) {
+                elLed.style.backgroundColor = info.c;
+                elLed.style.boxShadow = `0 0 8px ${info.c}`;
+            }
+            if (elLabel) {
+                elLabel.innerText = info.t;
+                elLabel.style.color = info.c;
             }
         });
     } else if (status === 'offline') {
-        ['led-iaq', 'led-co2', 'led-pm25'].forEach(id => {
-            const el = q(id);
-            if (el) { el.className = 'led led-offline'; el.style.boxShadow = ''; }
+        smartSensors.forEach(s => {
+            const elLed = q('led-' + s);
+            const elLabel = q('label-' + s);
+            if (elLed) {
+                elLed.style.backgroundColor = '#64748b';
+                elLed.style.boxShadow = '';
+            }
+            if (elLabel) {
+                elLabel.innerText = '--';
+                elLabel.style.color = '#64748b';
+            }
         });
     }
 }
-
 // --- GAUGE OTTIMIZZATO PER GRIGLIA 3x3 ---
 function drawGauge(canvasId, val, cfg) {
     const canvas = q(canvasId); if (!canvas) return;
@@ -79,11 +116,11 @@ function drawGauge(canvasId, val, cfg) {
     ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
     const cx = w / 2;
     const cy = h * 0.85;
-    const r = Math.min(w, h) * 0.48; 
+    const r = Math.min(w, h) * 0.48;
     ctx.clearRect(0, 0, w, h);
-    ctx.strokeStyle = '#ffffff'; ctx.fillStyle = '#ffffff'; 
+    ctx.strokeStyle = '#ffffff'; ctx.fillStyle = '#ffffff';
     const fontSize = w < 130 ? 8 : 10;
-    ctx.font = `bold ${fontSize}px Arial`; 
+    ctx.font = `bold ${fontSize}px Arial`;
     ctx.textAlign = 'center';
     for (let i = 0; i <= 10; i++) {
         const angle = Math.PI + (Math.PI * (i / 10));
@@ -142,7 +179,7 @@ function openModal(sensor) {
 // --- LOGICA DI STAMPA ---
 function avviaStampa(campo) {
     if (q('sideMenu')) q('sideMenu').classList.remove('active');
-    openModal(campo); 
+    openModal(campo);
 }
 
 function eseguiStampaEffettiva() {
@@ -170,7 +207,7 @@ function eseguiStampaEffettiva() {
             bigChart.options.scales.x.ticks.color = '#ffffff';
             bigChart.options.scales.y.ticks.color = '#ffffff';
             bigChart.options.plugins.legend.labels.color = '#ffffff';
-            bigChart.update('none'); 
+            bigChart.update('none');
             if (q('modalCoords')) q('modalCoords').style.color = 'white';
         }, 500);
     }, 250);
@@ -178,7 +215,7 @@ function eseguiStampaEffettiva() {
 
 // --- FETCH E DATI (THINGSPEAK) ---
 async function fetchSensorData() {
-    const wifiLed = q('wifi-led'); 
+    const wifiLed = q('wifi-led');
     try {
         const response = await fetch('https://api.thingspeak.com/channels/3221413/feeds/last.json');
         if (!response.ok) throw new Error('Network response was not ok');
@@ -193,8 +230,9 @@ async function fetchSensorData() {
             data: new Date(tsData.created_at).toLocaleDateString('it-IT')
         };
 
+        // 1. STATO CONNESSIONE E LED/TESTI (Sempre immediati)
         if (wifiLed) wifiLed.className = 'led led-online';
-        updateStatusLEDs('online', data); // Passiamo i dati per i colori IAQ/CO2/PM
+        updateStatusLEDs('online', data);
 
         coordsAttuali = `LAT: ${data.lat} | LON: ${data.lon}`;
         if (q('clock')) q('clock').innerText = data.ora;
@@ -212,28 +250,33 @@ async function fetchSensorData() {
             const val = parseFloat(data[key]);
             if (isNaN(val)) return;
             const cfg = sensorCfg[key];
+
+            // 2. AGGIORNAMENTO VALORI NUMERICI (Sempre, per essere sincronizzati con i LED)
+            if (q(cfg.targetId)) {
+                let valoreDisplay = (key === 'press_mb') ? val.toFixed(0) : val.toFixed(1);
+                q(cfg.targetId).innerText = valoreDisplay + (cfg.u ? ' ' + cfg.u : '');
+            }
+
+            // 3. AGGIORNAMENTO GRAFICI E GAUGE (Solo ogni "intervallo" per non appesantire)
             if (deveAggiornare) {
-                if (q(cfg.targetId)) {
-                    let valoreDisplay = (key === 'press_mb') ? val.toFixed(0) : val.toFixed(1);
-                    q(cfg.targetId).innerText = valoreDisplay + (cfg.u ? ' ' + cfg.u : '');
-                }
                 updateMiniChart(key, val);
                 if (key === 'temp' || key === 'hum' || key === 'press_mb') {
                     drawGauge('gauge' + cfg.id, val, cfg);
                 }
             }
+
+            // Icona IAQ laterale
             if (key === 'iaq' && q('iaqIcon')) {
-                let col = getAQIColor('iaq', val);
-                q('iaqIcon').style.setProperty('color', col, 'important');
+                let info = getAQIInfo('iaq', val);
+                q('iaqIcon').style.setProperty('color', info.c, 'important');
             }
         });
-    } catch (e) { 
-        console.error("Errore Fetch:", e); 
+    } catch (e) {
+        console.error("Errore Fetch:", e);
         if (wifiLed) wifiLed.className = 'led led-offline';
         updateStatusLEDs('offline');
     }
 }
-
 function updateMiniChart(key, val) {
     const chart = miniCharts[key]; if (!chart) return;
     const timeLabel = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -306,7 +349,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initCharts();
     caricaPreferenzeUtente();
     await fetchSensorData();
-    setInterval(async () => { await fetchSensorData(); }, 1000);
+    setInterval(async () => { await fetchSensorData(); }, 15000);
 });
 
 function closeModal() { q('chartModal').style.display = 'none'; }

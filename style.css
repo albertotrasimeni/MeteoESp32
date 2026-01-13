@@ -57,9 +57,38 @@ body {
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    background-color: #64748b; /* Colore base grigio */
+    background-color: #64748b;
+    /* Colore base grigio */
     transition: 0.3s;
-    flex-shrink: 0; /* IMPEDISCE AL LED DI SCHIACCIARSI */
+    flex-shrink: 0;
+    /* IMPEDISCE AL LED DI SCHIACCIARSI */
+}
+
+.led-group {
+    display: flex;
+    flex-direction: column;
+    /* Mette il testo sotto il LED */
+    align-items: center;
+    /* Centra perfettamente LED e scritta */
+    justify-content: center;
+    min-width: 65px;
+    /* Spazio fisso per evitare che il titolo si sposti */
+    gap: 3px;
+    /* Distanza tra il LED e la scritta */
+}
+
+.led-label {
+    font-size: 8px;
+    /* Piccolo per non sformattare */
+    font-weight: 800;
+    /* Grassetto per la leggibilità */
+    text-transform: uppercase;
+    text-align: center;
+    line-height: 1;
+    white-space: nowrap;
+    /* Forza il testo su una sola riga */
+    transition: 0.3s;
+    /* Per un cambio colore fluido come il LED */
 }
 
 .led-online {
@@ -118,8 +147,10 @@ body {
     font-weight: bold;
     text-transform: uppercase;
     color: var(--text-dim);
-    display: flex; /* ALLINEA TITOLO E LED */
-    justify-content: space-between; /* TESTO A SX, LED A DX */
+    display: flex;
+    /* ALLINEA TITOLO E LED */
+    justify-content: space-between;
+    /* TESTO A SX, LED A DX */
     align-items: center;
     width: 100%;
 }
@@ -216,26 +247,86 @@ body {
 }
 
 @media (max-width: 900px) {
-    .grid-container { grid-template-columns: repeat(2, 1fr); }
+    .grid-container {
+        grid-template-columns: repeat(2, 1fr);
+    }
 }
 
 @media (max-width: 600px) {
-    .grid-container { grid-template-columns: 1fr; }
-    .wifi-status-container { display: none; }
+    .grid-container {
+        grid-template-columns: 1fr;
+    }
+
+    .wifi-status-container {
+        display: none;
+    }
 }
 
 /* --- SEZIONE STAMPA --- */
 @media print {
-    @page { size: portrait; margin: 1.5cm; }
-    body > *:not(#chartModal) { display: none !important; }
-    body { background: white !important; padding: 0; margin: 0; }
-    #chartModal { display: block !important; position: relative !important; visibility: visible !important; background: white !important; width: 100% !important; border: none !important; }
-    .modal-content { background: white !important; border: none !important; width: 100% !important; padding: 0 !important; }
-    #bigChartCanvas, .close-btn, .no-print, button { display: none !important; }
-    #printImg { display: block !important; visibility: visible !important; width: 100% !important; height: auto !important; margin: 20px auto; }
-    #modalTitle, #modalCoords { color: black !important; display: block !important; visibility: visible !important; text-align: center !important; }
-    #modalTitle { font-size: 24pt; margin-bottom: 10px; }
-    #modalCoords { font-size: 14pt; margin-bottom: 20px; }
+    @page {
+        size: portrait;
+        margin: 1.5cm;
+    }
+
+    body>*:not(#chartModal) {
+        display: none !important;
+    }
+
+    body {
+        background: white !important;
+        padding: 0;
+        margin: 0;
+    }
+
+    #chartModal {
+        display: block !important;
+        position: relative !important;
+        visibility: visible !important;
+        background: white !important;
+        width: 100% !important;
+        border: none !important;
+    }
+
+    .modal-content {
+        background: white !important;
+        border: none !important;
+        width: 100% !important;
+        padding: 0 !important;
+    }
+
+    #bigChartCanvas,
+    .close-btn,
+    .no-print,
+    button {
+        display: none !important;
+    }
+
+    #printImg {
+        display: block !important;
+        visibility: visible !important;
+        width: 100% !important;
+        height: auto !important;
+        margin: 20px auto;
+    }
+
+    #modalTitle,
+    #modalCoords {
+        color: black !important;
+        display: block !important;
+        visibility: visible !important;
+        text-align: center !important;
+    }
+
+    #modalTitle {
+        font-size: 24pt;
+        margin-bottom: 10px;
+    }
+
+    #modalCoords {
+        font-size: 14pt;
+        margin-bottom: 20px;
+    }
 }
 
 /* --- OTTIMIZZAZIONE CONSERVATIVA (MANTENIMENTO GRIGLIA 3x3) --- */
@@ -276,7 +367,7 @@ body {
     .app-title {
         font-size: 12px !important;
     }
-    
+
     .wifi-status-container {
         padding: 2px 8px !important;
     }
@@ -300,9 +391,11 @@ body {
     .grid-container {
         gap: 4px !important;
     }
+
     .card {
         height: 180px !important;
     }
+
     .value-large {
         font-size: 0.9rem !important;
     }

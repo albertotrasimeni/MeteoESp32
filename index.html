@@ -35,15 +35,19 @@
 
     <nav class="side-menu" id="sideMenu">
         <div class="menu-header">STAMPA STORICO</div>
-        <a href="#" onclick="avviaStampa('temp');"><i class="fas fa-thermometer-half" style="color:#ef4444"></i> Temperatura</a>
+        <a href="#" onclick="avviaStampa('temp');"><i class="fas fa-thermometer-half" style="color:#ef4444"></i>
+            Temperatura</a>
         <a href="#" onclick="avviaStampa('hum');"><i class="fas fa-droplet" style="color:#3b82f6"></i> Umidità</a>
-        <a href="#" onclick="avviaStampa('press_mb');"><i class="fas fa-gauge-high" style="color:#f59e0b"></i> Pressione</a>
-        <a href="#" onclick="avviaStampa('iaq');"><i class="fas fa-leaf" style="color:#10b981"></i> Qualità Aria (IAQ)</a>
+        <a href="#" onclick="avviaStampa('press_mb');"><i class="fas fa-gauge-high" style="color:#f59e0b"></i>
+            Pressione</a>
+        <a href="#" onclick="avviaStampa('iaq');"><i class="fas fa-leaf" style="color:#10b981"></i> Qualità Aria
+            (IAQ)</a>
         <a href="#" onclick="avviaStampa('co2');"><i class="fas fa-cloud" style="color:#a855f7"></i> CO2</a>
         <a href="#" onclick="avviaStampa('pm25');"><i class="fas fa-smog" style="color:#64748b"></i> PM 2.5</a>
         <a href="#" onclick="avviaStampa('uv');"><i class="fas fa-sun" style="color:#fbbf24"></i> Indice UV</a>
         <a href="#" onclick="avviaStampa('wind');"><i class="fas fa-wind" style="color:#0ea5e9"></i> Vento</a>
-        <a href="#" onclick="esportaCSV();" style="background: rgba(16, 185, 129, 0.1); border-radius: 8px; margin-top: 5px;">
+        <a href="#" onclick="esportaCSV();"
+            style="background: rgba(16, 185, 129, 0.1); border-radius: 8px; margin-top: 5px;">
             <i class="fas fa-file-csv" style="color:#10b981"></i> <b>Esporta Dati CSV</b>
         </a>
         <hr style="border:0; border-top:1px solid #334155; margin:15px 0;">
@@ -100,7 +104,10 @@
                         <i class="fas fa-wind" id="iaqIcon"></i>
                         <span>Qualità Aria</span>
                     </div>
-                    <div id="led-iaq" class="led"></div>
+                    <div class="led-group">
+                        <div id="led-iaq" class="led"></div>
+                        <span id="label-iaq" class="led-label">--</span>
+                    </div>
                 </div>
                 <div class="value-large" id="iaqValue">-- IAQ</div>
                 <div class="mini-chart"><canvas id="miniIaq"></canvas></div>
@@ -112,7 +119,10 @@
                         <i class="fas fa-cloud" style="color:#a855f7"></i>
                         <span>CO2</span>
                     </div>
-                    <div id="led-co2" class="led"></div>
+                    <div class="led-group">
+                        <div id="led-co2" class="led"></div>
+                        <span id="label-co2" class="led-label">--</span>
+                    </div>
                 </div>
                 <div class="value-large" id="co2Value">-- ppm</div>
                 <div class="mini-chart"><canvas id="miniCo2"></canvas></div>
@@ -124,7 +134,10 @@
                         <i class="fas fa-smog" style="color:#64748b"></i>
                         <span>PM 2.5</span>
                     </div>
-                    <div id="led-pm25" class="led"></div>
+                    <div class="led-group">
+                        <div id="led-pm25" class="led"></div>
+                        <span id="label-pm25" class="led-label">--</span>
+                    </div>
                 </div>
                 <div class="value-large" id="pm25Value">-- µg/m³</div>
                 <div class="mini-chart"><canvas id="miniPm25"></canvas></div>
@@ -135,6 +148,10 @@
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <i class="fas fa-sun" style="color:#fbbf24"></i>
                         <span>Indice UV</span>
+                    </div>
+                    <div class="led-group">
+                        <div id="led-uv" class="led"></div>
+                        <span id="label-uv" class="led-label">--</span>
                     </div>
                 </div>
                 <div class="value-large" id="uvValue">-- Index</div>
@@ -147,11 +164,16 @@
                         <i class="fas fa-wind" style="color:#0ea5e9"></i>
                         <span>Vento</span>
                     </div>
+                    <div class="led-group">
+                        <div id="led-wind" class="led"></div>
+                        <span id="label-wind" class="led-label">--</span>
+                    </div>
                 </div>
                 <div class="value-large" id="windValue">-- km/h</div>
                 <div class="mini-chart"><canvas id="miniWind"></canvas></div>
             </div>
 
+            
             <div class="card" id="block-gps">
                 <div class="card-header">
                     <div style="display: flex; align-items: center; gap: 8px;">
@@ -159,10 +181,15 @@
                         <span>Posizione GPS</span>
                     </div>
                 </div>
-                <div class="gps-container" style="text-align:center; flex:1; display:flex; flex-direction:column; justify-content:center; padding:10px;">
-                    <div id="localitaNome" style="color:#38bdf8; font-size:1.4rem; font-weight:bold; margin-bottom:5px;">Cannara (PG)</div>
-                    <div id="gpsCoordinate" style="font-size:0.85rem; color:#f8fafc; margin-bottom:4px; line-height:1.2;">--° --′ --″ N<br>--° --′ --″ E</div>
-                    <div id="gpsRaw" style="font-size:0.75rem; color:#94a3b8; opacity:0.7; margin-top:5px;">LAT: -- | LON: --</div>
+                <div class="gps-container"
+                    style="text-align:center; flex:1; display:flex; flex-direction:column; justify-content:center; padding:10px;">
+                    <div id="localitaNome"
+                        style="color:#38bdf8; font-size:1.4rem; font-weight:bold; margin-bottom:5px;">Cannara (PG)</div>
+                    <div id="gpsCoordinate"
+                        style="font-size:0.85rem; color:#f8fafc; margin-bottom:4px; line-height:1.2;">--° --′ --″
+                        N<br>--° --′ --″ E</div>
+                    <div id="gpsRaw" style="font-size:0.75rem; color:#94a3b8; opacity:0.7; margin-top:5px;">LAT: -- |
+                        LON: --</div>
                 </div>
             </div>
         </div>
@@ -177,7 +204,8 @@
                 <canvas id="bigChartCanvas"></canvas>
             </div>
             <div style="text-align:center; margin-top:20px;" class="no-print">
-                <button onclick="eseguiStampaEffettiva()" style="background:#38bdf8; color:white; border:none; padding:12px 25px; border-radius:8px; cursor:pointer; font-weight:bold; font-size:16px;">
+                <button onclick="eseguiStampaEffettiva()"
+                    style="background:#38bdf8; color:white; border:none; padding:12px 25px; border-radius:8px; cursor:pointer; font-weight:bold; font-size:16px;">
                     <i class="fas fa-print"></i> STAMPA REPORT
                 </button>
             </div>
@@ -186,4 +214,5 @@
 
     <script src="script.js"></script>
 </body>
+
 </html>
