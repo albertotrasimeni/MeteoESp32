@@ -166,13 +166,30 @@ function openModal(sensor) {
             }]
         },
         options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { labels: { color: '#ffffff' } } },
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    labels: { color: '#ffffff' }
+                }
+            },
             scales: {
-                x: { ticks: { color: '#ffffff' }, grid: { color: 'rgba(255,255,255,0.1)' } },
-                y: { ticks: { color: '#ffffff' }, grid: { color: 'rgba(255,255,255,0.1)' } }
+                x: {
+                    ticks: { color: '#ffffff' },
+                    grid: {
+                        color: 'rgba(148,163,184,0.35)'
+                    }
+                },
+                y: {
+                    ticks: { color: '#ffffff' },
+                    grid: {
+                        color: 'rgba(148,163,184,0.35)'
+                    }
+                }
             }
+
         }
+
     });
 }
 
@@ -313,16 +330,47 @@ function initCharts() {
         const canvas = q('mini' + sensorCfg[k].id); if (!canvas) return;
         miniCharts[k] = new Chart(canvas.getContext('2d'), {
             type: 'line',
-            data: { labels: [], datasets: [{ data: [], borderColor: sensorCfg[k].c, borderWidth: 2, pointRadius: 0, fill: false }] },
+            data: {
+                labels: [],
+                datasets: [{
+                    data: [],
+                    borderColor: sensorCfg[k].c,
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    fill: false
+                }]
+            },
             options: {
-                responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
                 scales: {
-                    x: { display: true, ticks: { color: '#ffffff', font: { size: 8 } } },
-                    y: { display: true, ticks: { color: '#ffffff', font: { size: 8 } } }
+                    x: {
+                        display: true,
+                        ticks: {
+                            color: '#ffffff',
+                            font: { size: 8 }
+                        },
+                        grid: {
+                            color: 'rgba(148,163,184,0.45)'
+                        }
+                    },
+                    y: {
+                        display: true,
+                        ticks: {
+                            color: '#ffffff',
+                            font: { size: 8 }
+                        },
+                        grid: {
+                            color: 'rgba(148,163,184,0.45)'
+                        }
+                    }
                 }
             }
         });
+
     });
 }
 

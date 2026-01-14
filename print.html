@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="it">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,38 +8,119 @@
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    
+
     <style>
-        :root { --accent: #0ea5e9; --border: #e2e8f0; }
-        body { font-family: 'Segoe UI', sans-serif; padding: 40px; color: #1e293b; background: white; margin: 0; }
-        
-        header { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid var(--accent); padding-bottom: 15px; margin-bottom: 30px; position: relative; }
-        
-        /* Ottimizzazione Grid per Mobile: da 4 colonne a 2 o 1 su schermi piccoli */
-        .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px; }
-        
+        :root {
+            --accent: #0ea5e9;
+            --border: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            padding: 40px;
+            color: #1e293b;
+            background: white;
+            margin: 0;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 3px solid var(--accent);
+            padding-bottom: 15px;
+            margin-bottom: 30px;
+            position: relative;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
         @media (max-width: 768px) {
-            body { padding: 15px; }
-            header { flex-direction: column; text-align: center; gap: 10px; }
-            .summary-grid { grid-template-columns: repeat(2, 1fr); }
+            body {
+                padding: 15px;
+            }
+
+            header {
+                flex-direction: column;
+                text-align: center;
+                gap: 10px;
+            }
+
+            .summary-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
 
         @media (max-width: 480px) {
-            .summary-grid { grid-template-columns: 1fr; }
+            .summary-grid {
+                grid-template-columns: 1fr;
+            }
         }
 
-        .summary-item { border: 1px solid var(--border); padding: 15px; border-radius: 8px; text-align: center; }
-        
-        .report-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
-        .chart-card { border: 1px solid var(--border); padding: 15px; height: 320px; border-radius: 8px; page-break-inside: avoid; background: #fff; display:flex; flex-direction:column; }
-        .chart-card h4 { margin: 0 0 8px 0; font-size: 1rem; }
-        .chart-wrapper { flex:1; position: relative; }
+        .summary-item {
+            border: 1px solid var(--border);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
 
-        /* Ottimizzazione Tabella per Mobile (Scroll orizzontale se necessario) */
-        .table-container { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 30px; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.8rem; min-width: 600px; }
-        th, td { border: 1px solid var(--border); padding: 8px; text-align: center; }
-        th { background-color: #f8fafc; color: var(--accent); }
+        .report-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+
+        .chart-card {
+            border: 1px solid var(--border);
+            padding: 15px;
+            height: 320px;
+            border-radius: 8px;
+            page-break-inside: avoid;
+            background: #fff;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chart-card h4 {
+            margin: 0 0 8px 0;
+            font-size: 1rem;
+        }
+
+        .chart-wrapper {
+            flex: 1;
+            position: relative;
+        }
+
+        .table-container {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin-top: 30px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+            min-width: 600px;
+        }
+
+        th,
+        td {
+            border: 1px solid var(--border);
+            padding: 8px;
+            text-align: center;
+        }
+
+        th {
+            background-color: #f8fafc;
+            color: var(--accent);
+        }
 
         .close-window {
             position: fixed;
@@ -52,19 +134,37 @@
             color: var(--accent);
             padding: 8px;
             border-radius: 6px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
         }
-        
-        @media print { 
-            .no-print { display: none !important; } 
-            body { padding: 10mm; } 
-            .chart-card { height: 280px; } 
-            .close-window { display: none !important; }
-            .table-container { overflow: visible; }
-            table { min-width: auto; }
+
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+
+            body {
+                padding: 10mm;
+            }
+
+            .chart-card {
+                height: 280px;
+            }
+
+            .close-window {
+                display: none !important;
+            }
+
+            .table-container {
+                overflow: visible;
+            }
+
+            table {
+                min-width: auto;
+            }
         }
     </style>
 </head>
+
 <body>
 
     <button class="no-print close-window" title="Chiudi" onclick="window.close()">
@@ -72,8 +172,14 @@
     </button>
 
     <div class="no-print" style="text-align:right; margin-bottom: 20px;">
-        <button onclick="window.print()" style="padding: 12px 20px; cursor:pointer; background: var(--accent); color:white; border:none; border-radius:5px; font-weight: bold;">
+        <button onclick="window.print()"
+            style="padding: 12px 20px; cursor:pointer; background: var(--accent); color:white; border:none; border-radius:5px; font-weight: bold;">
             <i class="fas fa-print"></i> STAMPA / SALVA PDF
+        </button>
+        <!-- ✅ Pulsante per esportazione CSV -->
+        <button onclick="exportCSV()"
+            style="padding: 12px 20px; cursor:pointer; background: var(--accent); color:white; border:none; border-radius:5px; font-weight: bold;">
+            <i class="fas fa-file-csv"></i> ESPORTA CSV
         </button>
     </div>
 
@@ -89,13 +195,16 @@
     </header>
 
     <div class="summary-grid" id="summaryBox"></div>
-    
+
     <div class="report-grid" id="chartsGrid"></div>
 
     <div class="table-container">
         <table>
             <thead>
                 <tr>
+                    <th>Anno</th>
+                    <th>Mese</th>
+                    <th>Giorno</th>
                     <th>Ora</th>
                     <th>Temp (°C)</th>
                     <th>Hum (%)</th>
@@ -107,6 +216,7 @@
                     <th>Vento (km/h)</th>
                 </tr>
             </thead>
+
             <tbody id="tableBody"></tbody>
         </table>
     </div>
@@ -115,15 +225,26 @@
         const data = JSON.parse(localStorage.getItem("printData") || 'null');
 
         const sets = [
-            {k:'temp', n:'Temperatura', c:'#ef4444'},
-            {k:'hum', n:'Umidità', c:'#3b82f6'},
-            {k:'press_mb', n:'Pressione', c:'#f59e0b'},
-            {k:'iaq', n:'Qualità Aria', c:'#10b981'},
-            {k:'co2', n:'CO2', c:'#a855f7'},
-            {k:'pm25', n:'PM2.5', c:'#64748b'},
-            {k:'uv', n:'Indice UV', c:'#fbbf24'},
-            {k:'wind', n:'Vento', c:'#0ea5e9'}
+            { k: 'temp', n: 'Temperatura', c: '#ef4444' },
+            { k: 'hum', n: 'Umidità', c: '#3b82f6' },
+            { k: 'press_mb', n: 'Pressione', c: '#f59e0b' },
+            { k: 'iaq', n: 'Qualità Aria', c: '#10b981' },
+            { k: 'co2', n: 'CO2', c: '#a855f7' },
+            { k: 'pm25', n: 'PM2.5', c: '#64748b' },
+            { k: 'uv', n: 'Indice UV', c: '#fbbf24' },
+            { k: 'wind', n: 'Vento', c: '#0ea5e9' }
         ];
+
+        function splitDate(label) {
+            const d = new Date(label);
+            return {
+                anno: d.getFullYear(),
+                mese: String(d.getMonth() + 1).padStart(2, '0'),
+                giorno: String(d.getDate()).padStart(2, '0'),
+                ora: String(d.getHours()).padStart(2, '0') + ':' +
+                    String(d.getMinutes()).padStart(2, '0')
+            };
+        }
 
         function safeVal(arr, i) { return (Array.isArray(arr) && arr[i] !== undefined) ? arr[i] : ''; }
 
@@ -135,20 +256,24 @@
             const summaryBox = document.getElementById('summaryBox');
 
             data.labels.forEach((label, i) => {
+                const t = splitDate(label);
+
                 const row = `<tr>
-                    <td>${label || ''}</td>
-                    <td>${safeVal(data.temp, i)}</td>
-                    <td>${safeVal(data.hum, i)}</td>
-                    <td>${safeVal(data.press_mb, i)}</td>
-                    <td>${safeVal(data.iaq, i)}</td>
-                    <td>${safeVal(data.co2, i)}</td>
-                    <td>${safeVal(data.pm25, i)}</td>
-                    <td>${safeVal(data.uv, i)}</td>
-                    <td>${safeVal(data.wind, i)}</td>
-                </tr>`;
+        <td>${t.anno}</td>
+        <td>${t.mese}</td>
+        <td>${t.giorno}</td>
+        <td>${t.ora}</td>
+        <td>${safeVal(data.temp, i)}</td>
+        <td>${safeVal(data.hum, i)}</td>
+        <td>${safeVal(data.press_mb, i)}</td>
+        <td>${safeVal(data.iaq, i)}</td>
+        <td>${safeVal(data.co2, i)}</td>
+        <td>${safeVal(data.pm25, i)}</td>
+        <td>${safeVal(data.uv, i)}</td>
+        <td>${safeVal(data.wind, i)}</td>
+    </tr>`;
                 tbody.innerHTML += row;
             });
-
             sets.forEach(s => {
                 const arr = data[s.k] || [];
                 const last = arr.length ? arr[arr.length - 1] : '';
@@ -217,12 +342,54 @@
                     localStorage.removeItem('autoPrint');
                     setTimeout(() => {
                         window.print();
-                        try { localStorage.removeItem('printData'); } catch(e) {}
+                        try { localStorage.removeItem('printData'); } catch (e) { }
                     }, 800);
                 }
             });
         } else {
             document.body.innerHTML = "<h1 style='text-align:center; margin-top:50px;'>Errore: Nessun dato trovato.<br><small>Torna alla dashboard e riprova.</small></h1>";
+        }
+
+        /* ✅ Funzione CSV compatibile con Excel / LibreOffice */
+        function exportCSV() {
+            if (!data || !Array.isArray(data.labels)) {
+                alert("Nessun dato disponibile per l'esportazione.");
+                return;
+            }
+
+            const headers = ["Anno","Mese","Giorno","Ora","Temp (°C)","Hum (%)","Press (hPa)","IAQ","CO2 (ppm)","PM2.5","UV","Vento (km/h)"];
+            const rows = [headers];
+
+            data.labels.forEach((label, i) => {
+                const t = splitDate(label);
+                const row = [
+                    t.anno, t.mese, t.giorno, t.ora,
+                    safeVal(data.temp, i),
+                    safeVal(data.hum, i),
+                    safeVal(data.press_mb, i),
+                    safeVal(data.iaq, i),
+                    safeVal(data.co2, i),
+                    safeVal(data.pm25, i),
+                    safeVal(data.uv, i),
+                    safeVal(data.wind, i)
+                ];
+                rows.push(row);
+            });
+
+            // 🔹 Generazione CSV con separatore “;” e virgolette per ogni valore
+            const csvContent = rows.map(r =>
+                r.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(";")
+            ).join("\r\n");
+
+            // 🔹 Aggiunta BOM UTF-8 per compatibilità Excel
+            const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = "report_meteo.csv";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
     </script>
 </body>
