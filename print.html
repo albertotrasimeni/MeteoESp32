@@ -1,200 +1,229 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Report Tecnico - Stazione Meteo ESP32</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Report Tecnico - Stazione Meteo ESP32</title>
 
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        :root { --accent: #0ea5e9; --border: #e2e8f0; }
+        body { font-family: 'Segoe UI', sans-serif; padding: 40px; color: #1e293b; background: white; margin: 0; }
+        
+        header { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid var(--accent); padding-bottom: 15px; margin-bottom: 30px; position: relative; }
+        
+        /* Ottimizzazione Grid per Mobile: da 4 colonne a 2 o 1 su schermi piccoli */
+        .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px; }
+        
+        @media (max-width: 768px) {
+            body { padding: 15px; }
+            header { flex-direction: column; text-align: center; gap: 10px; }
+            .summary-grid { grid-template-columns: repeat(2, 1fr); }
+        }
 
-<style>
-:root { --accent: #0ea5e9; --border: #e2e8f0; }
-body { font-family:'Segoe UI',sans-serif; padding:40px; color:#1e293b; background:white; margin:0; }
-header { display:flex; justify-content:space-between; align-items:center; border-bottom:3px solid var(--accent); padding-bottom:15px; margin-bottom:30px; }
-.summary-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:15px; margin-bottom:30px; }
-.summary-item { border:1px solid var(--border); padding:15px; border-radius:8px; text-align:center; }
-.report-grid { display:grid; grid-template-columns:1fr; gap:20px; }
-.chart-card { border:1px solid var(--border); padding:15px; height:320px; border-radius:8px; background:#fff; display:flex; flex-direction:column; }
-.chart-card h4 { margin:0 0 8px 0; font-size:1rem; }
-.chart-wrapper { flex:1; position:relative; }
-.table-container { width:100%; overflow-x:auto; margin-top:30px; }
-table { width:100%; border-collapse:collapse; font-size:0.8rem; min-width:600px; }
-th,td { border:1px solid var(--border); padding:8px; text-align:center; }
-th { background-color:#f8fafc; color:var(--accent); }
-.close-window { position:fixed; top:12px; right:12px; background:#fff; border:1px solid var(--border); font-size:20px; cursor:pointer; color:var(--accent); padding:8px; border-radius:6px; }
-@media print { .no-print{display:none!important;} body{padding:10mm;} .chart-card{height:280px;} .close-window{display:none!important;} }
-</style>
+        @media (max-width: 480px) {
+            .summary-grid { grid-template-columns: 1fr; }
+        }
+
+        .summary-item { border: 1px solid var(--border); padding: 15px; border-radius: 8px; text-align: center; }
+        
+        .report-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
+        .chart-card { border: 1px solid var(--border); padding: 15px; height: 320px; border-radius: 8px; page-break-inside: avoid; background: #fff; display:flex; flex-direction:column; }
+        .chart-card h4 { margin: 0 0 8px 0; font-size: 1rem; }
+        .chart-wrapper { flex:1; position: relative; }
+
+        /* Ottimizzazione Tabella per Mobile (Scroll orizzontale se necessario) */
+        .table-container { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 30px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.8rem; min-width: 600px; }
+        th, td { border: 1px solid var(--border); padding: 8px; text-align: center; }
+        th { background-color: #f8fafc; color: var(--accent); }
+
+        .close-window {
+            position: fixed;
+            top: 12px;
+            right: 12px;
+            z-index: 9999;
+            background: #fff;
+            border: 1px solid var(--border);
+            font-size: 20px;
+            cursor: pointer;
+            color: var(--accent);
+            padding: 8px;
+            border-radius: 6px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        @media print { 
+            .no-print { display: none !important; } 
+            body { padding: 10mm; } 
+            .chart-card { height: 280px; } 
+            .close-window { display: none !important; }
+            .table-container { overflow: visible; }
+            table { min-width: auto; }
+        }
+    </style>
 </head>
-
 <body>
 
-<button class="no-print close-window" title="Chiudi" onclick="window.close()"><i class="fas fa-times"></i></button>
+    <button class="no-print close-window" title="Chiudi" onclick="window.close()">
+        <i class="fas fa-times"></i>
+    </button>
 
-<div class="no-print" style="text-align:right; margin-bottom:20px;">
-  <button onclick="window.print()" style="padding:12px 20px; cursor:pointer; background:var(--accent); color:white; border:none; border-radius:5px; font-weight:bold;">
-    <i class="fas fa-print"></i> STAMPA / SALVA PDF
-  </button>
-  <button onclick="exportCSV()" style="padding:12px 20px; cursor:pointer; background:var(--accent); color:white; border:none; border-radius:5px; font-weight:bold;">
-    <i class="fas fa-file-csv"></i> ESPORTA CSV
-  </button>
-</div>
+    <div class="no-print" style="text-align:right; margin-bottom: 20px;">
+        <button onclick="window.print()" style="padding: 12px 20px; cursor:pointer; background: var(--accent); color:white; border:none; border-radius:5px; font-weight: bold;">
+            <i class="fas fa-print"></i> STAMPA / SALVA PDF
+        </button>
+    </div>
 
-<header>
-  <div>
-    <h1 style="margin:0; color:var(--accent); font-size:1.5rem;">REPORT METEO ESP32</h1>
-    <p id="genDate" style="color:#64748b; margin-top:5px; font-size:0.9rem;"></p>
-  </div>
-  <div style="font-size:0.9rem;">
-    <strong>Sistema:</strong> ESP32-WROOM<br>
-    <strong>FW:</strong> 2.3-ASYNC-PRO
-  </div>
-</header>
+    <header>
+        <div>
+            <h1 style="margin:0; color: var(--accent); font-size: 1.5rem;">REPORT METEO ESP32</h1>
+            <p id="genDate" style="color:#64748b; margin-top:5px; font-size: 0.9rem;"></p>
+        </div>
+        <div style="font-size: 0.9rem;">
+            <strong>Sistema:</strong> ESP32-WROOM<br>
+            <strong>FW:</strong> 2.3-ASYNC-PRO
+        </div>
+    </header>
 
-<div class="summary-grid" id="summaryBox"></div>
-<div class="report-grid" id="chartsGrid"></div>
+    <div class="summary-grid" id="summaryBox"></div>
+    
+    <div class="report-grid" id="chartsGrid"></div>
 
-<div class="table-container">
-  <table>
-    <thead>
-      <tr>
-        <th>Anno</th>
-        <th>Mese</th>
-        <th>Giorno</th>
-        <th>Ora</th>
-        <th>Temp (°C)</th>
-        <th>Hum (%)</th>
-        <th>Press (hPa)</th>
-        <th>IAQ</th>
-        <th>CO2 (ppm)</th>
-        <th>PM2.5</th>
-        <th>UV</th>
-        <th>Vento (km/h)</th>
-      </tr>
-    </thead>
-    <tbody id="tableBody"></tbody>
-  </table>
-</div>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Ora</th>
+                    <th>Temp (°C)</th>
+                    <th>Hum (%)</th>
+                    <th>Press (hPa)</th>
+                    <th>IAQ</th>
+                    <th>CO2 (ppm)</th>
+                    <th>PM2.5</th>
+                    <th>UV</th>
+                    <th>Vento (km/h)</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
 
-<script>
-/* ✅ CONFIGURA QUI IL TUO CHANNEL ID E API READ KEY */
-const CHANNEL_ID = "TUO_CHANNEL_ID";
-const READ_API_KEY = "TUO_API_KEY_LETTURA";
+    <script>
+        const data = JSON.parse(localStorage.getItem("printData") || 'null');
 
-/* Variabili principali */
-const sets = [
-  { k:'field1', n:'Temperatura', c:'#ef4444' },
-  { k:'field2', n:'Umidità', c:'#3b82f6' },
-  { k:'field3', n:'Pressione', c:'#f59e0b' },
-  { k:'field4', n:'Qualità Aria', c:'#10b981' },
-  { k:'field5', n:'CO2', c:'#a855f7' },
-  { k:'field6', n:'PM2.5', c:'#64748b' },
-  { k:'field7', n:'Indice UV', c:'#fbbf24' },
-  { k:'field8', n:'Vento', c:'#0ea5e9' }
-];
+        const sets = [
+            {k:'temp', n:'Temperatura', c:'#ef4444'},
+            {k:'hum', n:'Umidità', c:'#3b82f6'},
+            {k:'press_mb', n:'Pressione', c:'#f59e0b'},
+            {k:'iaq', n:'Qualità Aria', c:'#10b981'},
+            {k:'co2', n:'CO2', c:'#a855f7'},
+            {k:'pm25', n:'PM2.5', c:'#64748b'},
+            {k:'uv', n:'Indice UV', c:'#fbbf24'},
+            {k:'wind', n:'Vento', c:'#0ea5e9'}
+        ];
 
-/* Funzione principale: legge dati da ThingSpeak */
-async function loadData() {
-  const url = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?api_key=${READ_API_KEY}&results=1000`;
-  const res = await fetch(url);
-  const json = await res.json();
-  const feeds = json.feeds || [];
-  if (feeds.length === 0) {
-    document.body.innerHTML = "<h1 style='text-align:center;margin-top:50px;'>Nessun dato trovato nel canale ThingSpeak.</h1>";
-    return;
-  }
+        function safeVal(arr, i) { return (Array.isArray(arr) && arr[i] !== undefined) ? arr[i] : ''; }
 
-  /* Prepara gli array */
-  const labels = [];
-  const data = { labels };
-  sets.forEach(s => data[s.k] = []);
+        if (data && Array.isArray(data.labels)) {
+            document.getElementById('genDate').textContent = "Documento generato il: " + new Date().toLocaleString();
 
-  feeds.forEach(f => {
-    labels.push(f.created_at); // timestamp ISO
-    sets.forEach(s => data[s.k].push(parseFloat(f[s.k]) || ""));
-  });
+            const tbody = document.getElementById('tableBody');
+            const chartsGrid = document.getElementById('chartsGrid');
+            const summaryBox = document.getElementById('summaryBox');
 
-  renderReport(data);
-}
+            data.labels.forEach((label, i) => {
+                const row = `<tr>
+                    <td>${label || ''}</td>
+                    <td>${safeVal(data.temp, i)}</td>
+                    <td>${safeVal(data.hum, i)}</td>
+                    <td>${safeVal(data.press_mb, i)}</td>
+                    <td>${safeVal(data.iaq, i)}</td>
+                    <td>${safeVal(data.co2, i)}</td>
+                    <td>${safeVal(data.pm25, i)}</td>
+                    <td>${safeVal(data.uv, i)}</td>
+                    <td>${safeVal(data.wind, i)}</td>
+                </tr>`;
+                tbody.innerHTML += row;
+            });
 
-/* 🔹 Costruzione del report, tabelle e grafici */
-function renderReport(data) {
-  document.getElementById('genDate').textContent = "Documento generato il: " + new Date().toLocaleString();
-  const tbody = document.getElementById('tableBody');
-  const summaryBox = document.getElementById('summaryBox');
-  const chartsGrid = document.getElementById('chartsGrid');
+            sets.forEach(s => {
+                const arr = data[s.k] || [];
+                const last = arr.length ? arr[arr.length - 1] : '';
+                const item = document.createElement('div');
+                item.className = 'summary-item';
+                item.innerHTML = `<strong style="color:${s.c}">${s.n}</strong><div style="font-size:1.4rem; margin-top:8px;">${last}</div>`;
+                summaryBox.appendChild(item);
+            });
 
-  function parseTS(ts) {
-    const d = new Date(ts);
-    return {
-      anno: d.getFullYear(),
-      mese: String(d.getMonth()+1).padStart(2,"0"),
-      giorno: String(d.getDate()).padStart(2,"0"),
-      ora: String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")
-    };
-  }
+            const chartPromises = sets.map((s, idx) => {
+                return new Promise(resolve => {
+                    const card = document.createElement('div');
+                    card.className = 'chart-card';
+                    card.innerHTML = `<h4>Andamento ${s.n}</h4><div class="chart-wrapper"><canvas id="chart_${s.k}"></canvas></div>`;
+                    chartsGrid.appendChild(card);
 
-  data.labels.forEach((label, i) => {
-    const t = parseTS(label);
-    const row = `<tr>
-      <td>${t.anno}</td>
-      <td>${t.mese}</td>
-      <td>${t.giorno}</td>
-      <td>${t.ora}</td>
-      <td>${data.field1[i] ?? ""}</td>
-      <td>${data.field2[i] ?? ""}</td>
-      <td>${data.field3[i] ?? ""}</td>
-      <td>${data.field4[i] ?? ""}</td>
-      <td>${data.field5[i] ?? ""}</td>
-      <td>${data.field6[i] ?? ""}</td>
-      <td>${data.field7[i] ?? ""}</td>
-      <td>${data.field8[i] ?? ""}</td>
-    </tr>`;
-    tbody.insertAdjacentHTML("beforeend", row);
-  });
+                    setTimeout(() => {
+                        const canvasEl = document.getElementById(`chart_${s.k}`);
+                        if (!canvasEl) { resolve(true); return; }
+                        const ctx = canvasEl.getContext('2d');
+                        try {
+                            new Chart(ctx, {
+                                type: 'line',
+                                data: {
+                                    labels: data.labels,
+                                    datasets: [{ label: s.n, data: (data[s.k] || []), borderColor: s.c, fill: true, backgroundColor: s.c + '10', tension: 0.3 }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: { legend: { display: false } },
+                                    scales: {
+                                        x: {
+                                            display: true,
+                                            ticks: {
+                                                color: '#64748b',
+                                                autoSkip: true,
+                                                maxRotation: 45,
+                                                minRotation: 0,
+                                                maxTicksLimit: 10,
+                                                font: { size: 10 }
+                                            },
+                                            grid: { display: false }
+                                        },
+                                        y: {
+                                            ticks: {
+                                                color: '#64748b',
+                                                font: { size: 10 }
+                                            },
+                                            grid: { color: 'rgba(0,0,0,0.05)' }
+                                        }
+                                    },
+                                    layout: { padding: { bottom: 6 } }
+                                }
+                            });
+                        } catch (err) {
+                            console.warn('Errore grafico', s.k, err);
+                        }
+                        resolve(true);
+                    }, idx * 80);
+                });
+            });
 
-  sets.forEach(s => {
-    const arr = data[s.k] || [];
-    const last = arr[arr.length-1] ?? "";
-    const item = document.createElement("div");
-    item.className = "summary-item";
-    item.innerHTML = `<strong style="color:${s.c}">${s.n}</strong><div style="font-size:1.4rem;margin-top:8px;">${last}</div>`;
-    summaryBox.appendChild(item);
-  });
-
-  sets.forEach((s, idx) => {
-    const card = document.createElement("div");
-    card.className = "chart-card";
-    card.innerHTML = `<h4>Andamento ${s.n}</h4><div class="chart-wrapper"><canvas id="chart_${s.k}"></canvas></div>`;
-    chartsGrid.appendChild(card);
-    const ctx = document.getElementById(`chart_${s.k}`).getContext("2d");
-    new Chart(ctx, {
-      type: 'line',
-      data: { labels: data.labels.map(ts=>new Date(ts).toLocaleString()), datasets:[{ label:s.n, data:data[s.k], borderColor:s.c, backgroundColor:s.c+'10', fill:true, tension:0.3 }]},
-      options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{ticks:{color:'#64748b',font:{size:10}},grid:{display:false}}, y:{ticks:{color:'#64748b',font:{size:10}},grid:{color:'rgba(0,0,0,0.05)'}}}}
-    });
-  });
-}
-
-/* ✅ Esportazione CSV */
-function exportCSV() {
-  const rows = [["Anno","Mese","Giorno","Ora","Temp (°C)","Hum (%)","Press (hPa)","IAQ","CO2 (ppm)","PM2.5","UV","Vento (km/h)"]];
-  document.querySelectorAll("#tableBody tr").forEach(tr => {
-    const vals = [...tr.querySelectorAll("td")].map(td => `"${td.textContent.replace(/"/g,'""')}"`);
-    rows.push(vals);
-  });
-  const csv = "\uFEFF" + rows.map(r => r.join(";")).join("\r\n");
-  const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "report_meteo.csv";
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
-/* Avvio caricamento dati */
-loadData();
-</script>
+            Promise.all(chartPromises).then(() => {
+                if (localStorage.getItem('autoPrint') === '1') {
+                    localStorage.removeItem('autoPrint');
+                    setTimeout(() => {
+                        window.print();
+                        try { localStorage.removeItem('printData'); } catch(e) {}
+                    }, 800);
+                }
+            });
+        } else {
+            document.body.innerHTML = "<h1 style='text-align:center; margin-top:50px;'>Errore: Nessun dato trovato.<br><small>Torna alla dashboard e riprova.</small></h1>";
+        }
+    </script>
 </body>
 </html>

@@ -302,27 +302,97 @@ function updateMiniChart(key, val) {
     chart.update('none');
 }
 
-function esportaCSV() {
-    const righeDati = {};
-    const sensoriPresenti = Object.keys(miniCharts);
-    sensoriPresenti.forEach(key => {
-        const chart = miniCharts[key];
-        chart.data.labels.forEach((label, index) => {
-            if (!righeDati[label]) righeDati[label] = {};
-            righeDati[label][key] = chart.data.datasets[0].data[index];
+async function esportaCSV() {
+    try {
+        // Legge il tempo impostato sulla dashboard (da 15000ms a 14400000ms)
+        const intervalloMs = getSavedInterval(); 
+        
+        let risultati = 500; 
+        let timescale = "";   
+        
+        // --- 1. CONFIGURAZIONE DINAMICA (Tabella Documentazione) ---
+        if (intervalloMs <= 15000) {        
+            risultati = 480; // 15 sec -> Ultime 2 ore
+        } else if (intervalloMs <= 30000) { 
+            risultati = 480; // 30 sec -> Ultime 4 ore
+        } else if (intervalloMs <= 60000) { 
+            risultati = 720; timescale = "&timescale=1"; // 1 min -> Ultime 12 ore
+        } else if (intervalloMs <= 300000) { 
+            risultati = 288; timescale = "&timescale=5"; // 5 min -> Ultime 24 ore
+        } else if (intervalloMs <= 600000) { 
+            risultati = 288; timescale = "&timescale=10"; // 10 min -> Ultime 48 ore
+        } else if (intervalloMs <= 1800000) { 
+            risultati = 336; timescale = "&timescale=30"; // 30 min -> 7 giorni
+        } else if (intervalloMs <= 3600000) { 
+            risultati = 360; timescale = "&timescale=60"; // 1 ora -> 15 giorni
+        } else if (intervalloMs <= 7200000) { 
+            risultati = 360; timescale = "&timescale=120"; // 2 ore -> 1 mese
+        } else {                             
+            risultati = 540; timescale = "&timescale=240"; // 4 ore -> 3 mesi
+        }
+
+        const channelID = "3221413";
+        const url = `https://api.thingspeak.com/channels/${channelID}/feeds.json?results=${risultati}${timescale}`;
+
+        const response = await fetch(url);
+        const dataJson = await response.json();
+        const feeds = dataJson.feeds;
+
+        if (!feeds || feeds.length === 0) {
+            alert("Nessun dato trovato per l'intervallo selezionato.");
+            return;
+        }
+
+        const sensoriPresenti = Object.keys(sensorCfg);
+        let csvContent = "GIORNO;MESE;ANNO;ORA;" + sensoriPresenti.map(key => sensorCfg[key].id.toUpperCase()).join(";") + "\n";
+
+        // --- 2. FILTRO DI SINCRONIZZAZIONE ---
+        // Questa parte assicura che venga scritta solo 1 riga ogni 'intervalloMs'
+        let ultimoTimestampSalvato = 0;
+
+        feeds.forEach(f => {
+            const dataCorrente = new Date(f.created_at);
+            const timestampCorrente = dataCorrente.getTime();
+
+            // Calcoliamo la differenza di tempo dall'ultima riga inserita
+            // Usiamo un margine di tolleranza di 2 secondi (2000ms) per piccoli ritardi di rete
+            if (timestampCorrente - ultimoTimestampSalvato < (intervalloMs - 2000)) {
+                return; // Salta questa riga: è un doppione o un invio troppo ravvicinato
+            }
+
+            ultimoTimestampSalvato = timestampCorrente;
+
+            const giorno = String(dataCorrente.getDate()).padStart(2, '0');
+            const mese = String(dataCorrente.getMonth() + 1).padStart(2, '0');
+            const anno = dataCorrente.getFullYear();
+            const ora = dataCorrente.getHours().toString().padStart(2, '0') + ":" + 
+                        dataCorrente.getMinutes().toString().padStart(2, '0') + ":" + 
+                        dataCorrente.getSeconds().toString().padStart(2, '0');
+
+            let riga = [giorno, mese, anno, ora];
+            const fields = [f.field1, f.field2, f.field3, f.field4, f.field5, f.field6, f.field7, f.field8];
+            
+            fields.forEach(val => {
+                let valFmt = (val !== undefined && val !== null) ? val.toString().replace('.', ',') : "";
+                riga.push(valFmt);
+            });
+            
+            csvContent += riga.join(";") + "\n";
         });
-    });
-    let csvContent = "sep=,\nOra," + sensoriPresenti.map(key => sensorCfg[key].id).join(",") + "\n";
-    Object.keys(righeDati).forEach(ora => {
-        let riga = [ora];
-        sensoriPresenti.forEach(key => { riga.push(righeDati[ora][key] || ""); });
-        csvContent += riga.join(",") + "\n";
-    });
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `Meteo_${new Date().toLocaleDateString('it-IT')}.csv`;
-    link.click();
+
+        // --- 3. DOWNLOAD DEL FILE ---
+        const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.setAttribute("download", `Report_Meteo_Sincro.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+    } catch (err) {
+        console.error("Errore esportazione:", err);
+        alert("Si è verificato un errore durante il download del CSV.");
+    }
 }
 
 function initCharts() {
