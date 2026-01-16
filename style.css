@@ -233,7 +233,7 @@ body {
     margin-top: 0;
 }
 
-/* --- MEDIA QUERY ORIGINALI (NON TOCCATE) --- */
+/* --- MEDIA QUERY ORIGINALI --- */
 @media (max-width: 900px) {
     .grid-container {
         grid-template-columns: repeat(2, 1fr);
@@ -328,7 +328,6 @@ body {
     height: 68px !important;
 }
 
-/* Mantieni proporzioni anche su schermi più piccoli */
 @media (max-width: 1200px),
        (max-width: 1100px),
        (max-width: 900px) {
@@ -340,4 +339,70 @@ body {
     .card {
         height: 250px !important;
     }
+}
+
+/*=====================================================
+   AGGIUNTE PER RICERCA GPS (VERSIONE OTTIMIZZATA)
+===================================================== */
+
+.gps-search-container {
+    display: flex;
+    align-items: center;
+    position: absolute;
+    right: 10px;
+    background: var(--bg-dark);
+    border-radius: 20px;
+    padding: 2px 10px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid var(--border);
+    z-index: 100;
+}
+
+/* Finestra di input molto larga per indirizzi complessi */
+.gps-search-container.active {
+    border: 1px solid var(--accent);
+    width: 300px; 
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.2);
+}
+
+#addressInput {
+    width: 0;
+    border: none;
+    background: transparent;
+    color: var(--text-main);
+    outline: none;
+    font-size: 0.9rem;
+    transition: width 0.3s ease;
+    padding: 0;
+}
+
+.gps-search-container.active #addressInput {
+    width: 260px; 
+    padding: 5px 10px;
+}
+
+.search-trigger {
+    cursor: pointer;
+    color: var(--text-dim);
+    font-size: 1rem;
+    padding: 5px;
+    transition: color 0.2s;
+}
+
+.search-trigger:hover {
+    color: var(--accent);
+}
+
+/* Evita che il titolo della card copra la barra di ricerca */
+#block-gps .card-header {
+    position: relative !important;
+    overflow: visible !important;
+}
+
+/* Stile per il testo della località (quello azzurro nell'immagine) */
+#localitaNome {
+    line-height: 1.2;
+    margin-bottom: 8px;
+    display: block;
+    word-wrap: break-word; /* Evita che indirizzi lunghi escano dalla card */
 }

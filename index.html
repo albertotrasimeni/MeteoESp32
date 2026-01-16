@@ -61,10 +61,8 @@
         <div class="grid-container">
             <div class="card" id="block-temp">
                 <div class="card-header">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <i class="fas fa-thermometer-half" style="color:#ef4444"></i>
-                        <span>Temperatura</span>
-                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;"><i class="fas fa-thermometer-half"
+                            style="color:#ef4444"></i><span>Temperatura</span></div>
                     <div id="led-temp" class="led"></div>
                 </div>
                 <div class="gauge-container"><canvas id="gaugeTemp"></canvas></div>
@@ -74,10 +72,8 @@
 
             <div class="card" id="block-hum">
                 <div class="card-header">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <i class="fas fa-droplet" style="color:#3b82f6"></i>
-                        <span>Umidità</span>
-                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;"><i class="fas fa-droplet"
+                            style="color:#3b82f6"></i><span>Umidità</span></div>
                     <div id="led-hum" class="led"></div>
                 </div>
                 <div class="gauge-container"><canvas id="gaugeHum"></canvas></div>
@@ -87,10 +83,8 @@
 
             <div class="card" id="block-press_mb">
                 <div class="card-header">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <i class="fas fa-gauge-high" style="color:#f59e0b"></i>
-                        <span>Pressione</span>
-                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;"><i class="fas fa-gauge-high"
+                            style="color:#f59e0b"></i><span>Pressione</span></div>
                     <div id="led-press" class="led"></div>
                 </div>
                 <div class="gauge-container"><canvas id="gaugePress"></canvas></div>
@@ -100,13 +94,10 @@
 
             <div class="card" id="block-iaq">
                 <div class="card-header">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <i class="fas fa-wind" id="iaqIcon"></i>
-                        <span>Qualità Aria</span>
-                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;"><i class="fas fa-wind"
+                            id="iaqIcon"></i><span>Qualità Aria</span></div>
                     <div class="led-group">
-                        <div id="led-iaq" class="led"></div>
-                        <span id="label-iaq" class="led-label">--</span>
+                        <div id="led-iaq" class="led"></div><span id="label-iaq" class="led-label">--</span>
                     </div>
                 </div>
                 <div class="value-large" id="iaqValue">-- IAQ</div>
@@ -115,13 +106,10 @@
 
             <div class="card" id="block-co2">
                 <div class="card-header">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <i class="fas fa-cloud" style="color:#a855f7"></i>
-                        <span>CO2</span>
-                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;"><i class="fas fa-cloud"
+                            style="color:#a855f7"></i><span>CO2</span></div>
                     <div class="led-group">
-                        <div id="led-co2" class="led"></div>
-                        <span id="label-co2" class="led-label">--</span>
+                        <div id="led-co2" class="led"></div><span id="label-co2" class="led-label">--</span>
                     </div>
                 </div>
                 <div class="value-large" id="co2Value">-- ppm</div>
@@ -130,13 +118,10 @@
 
             <div class="card" id="block-pm25">
                 <div class="card-header">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <i class="fas fa-smog" style="color:#64748b"></i>
-                        <span>PM 2.5</span>
-                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;"><i class="fas fa-smog"
+                            style="color:#64748b"></i><span>PM 2.5</span></div>
                     <div class="led-group">
-                        <div id="led-pm25" class="led"></div>
-                        <span id="label-pm25" class="led-label">--</span>
+                        <div id="led-pm25" class="led"></div><span id="label-pm25" class="led-label">--</span>
                     </div>
                 </div>
                 <div class="value-large" id="pm25Value">-- µg/m³</div>
@@ -145,13 +130,10 @@
 
             <div class="card" id="block-uv">
                 <div class="card-header">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <i class="fas fa-sun" style="color:#fbbf24"></i>
-                        <span>Indice UV</span>
-                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;"><i class="fas fa-sun"
+                            style="color:#fbbf24"></i><span>Indice UV</span></div>
                     <div class="led-group">
-                        <div id="led-uv" class="led"></div>
-                        <span id="label-uv" class="led-label">--</span>
+                        <div id="led-uv" class="led"></div><span id="label-uv" class="led-label">--</span>
                     </div>
                 </div>
                 <div class="value-large" id="uvValue">-- Index</div>
@@ -160,25 +142,30 @@
 
             <div class="card" id="block-wind">
                 <div class="card-header">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <i class="fas fa-wind" style="color:#0ea5e9"></i>
-                        <span>Vento</span>
-                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;"><i class="fas fa-wind"
+                            style="color:#0ea5e9"></i><span>Vento</span></div>
                     <div class="led-group">
-                        <div id="led-wind" class="led"></div>
-                        <span id="label-wind" class="led-label">--</span>
+                        <div id="led-wind" class="led"></div><span id="label-wind" class="led-label">--</span>
                     </div>
                 </div>
                 <div class="value-large" id="windValue">-- km/h</div>
                 <div class="mini-chart"><canvas id="miniWind"></canvas></div>
             </div>
 
-            
             <div class="card" id="block-gps">
-                <div class="card-header">
+                <div class="card-header"
+                    style="position: relative; display: flex; justify-content: space-between; align-items: center;">
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <i class="fas fa-location-dot" style="color:#38bdf8"></i>
                         <span>Posizione GPS</span>
+                    </div>
+                    <div class="gps-search-container">
+                        <input type="text" id="addressInput" placeholder="Cerca..."
+                            onkeydown="if(event.key==='Enter') cercaIndirizzo()">
+                        <input type="text" id="addressInput" placeholder="Cerca...">
+                        <!---<button onclick="console.log('Click rilevato!'); cercaIndirizzo();">VAI</button> --->
+                        <i class="fas fa-magnifying-glass search-trigger" onclick="toggleSearch()"
+                            title="Cerca indirizzo"></i>
                     </div>
                 </div>
                 <div class="gps-container"

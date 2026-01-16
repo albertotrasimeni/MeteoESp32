@@ -2,15 +2,13 @@ const q = id => document.getElementById(id);
 let miniCharts = {};
 let bigChart = null;
 let lastChartUpdate = 0;
-let coordsAttuali = "";
+let isManualLocation = false; 
 
-// Legge l'intervallo da settings.html
 function getSavedInterval() {
     const saved = localStorage.getItem('updateInterval');
     return saved ? parseInt(saved) : 15000;
 }
 
-// CONFIGURAZIONE SENSORI
 const sensorCfg = {
     temp: { id: 'Temp', c: '#ef4444', min: -10, max: 50, u: '°C', targetId: 'tempValue' },
     hum: { id: 'Hum', c: '#3b82f6', min: 0, max: 100, u: '%', targetId: 'humValue' },
@@ -22,7 +20,6 @@ const sensorCfg = {
     wind: { id: 'Wind', c: '#0ea5e9', u: 'km/h', targetId: 'windValue' }
 };
 
-// --- LOGICA COLORI E TESTI QUALITÀ ARIA ---
 function getAQIInfo(tipo, val) {
     if (tipo === 'iaq') {
         if (val <= 50) return { c: '#10b981', t: 'OTTIMA' };
@@ -39,70 +36,46 @@ function getAQIInfo(tipo, val) {
         if (val <= 50) return { c: '#f59e0b', t: 'MODERATA' };
         return { c: '#ef4444', t: 'ALTA' };
     }
-
     if (tipo === 'uv') {
         if (val <= 2) return { c: '#10b981', t: 'BASSO' };
         if (val <= 5) return { c: '#f59e0b', t: 'MODERATO' };
-        if (val <= 7) return { c: '#f97316', t: 'ALTO' }; // Arancione
+        if (val <= 7) return { c: '#f97316', t: 'ALTO' };
         return { c: '#ef4444', t: 'ESTREMO' };
     }
-
     if (tipo === 'wind') {
         if (val <= 19) return { c: '#10b981', t: 'BREZZA' };
         if (val <= 38) return { c: '#f59e0b', t: 'MODERATO' };
         return { c: '#ef4444', t: 'FORTE' };
     }
-
     return { c: '#10b981', t: '--' };
 }
 
-// --- FUNZIONE AGGIORNATA PER LED E TESTI DINAMICI ---
 function updateStatusLEDs(status, data = null) {
-    // 1. LED BASE (Semplice Online/Offline)
     const basicLeds = { 'led-temp': 'online', 'led-hum': 'online', 'led-press': 'online' };
-
     Object.keys(basicLeds).forEach(id => {
         const el = q(id);
         if (el) el.className = 'led ' + (status === 'online' ? 'led-online' : 'led-offline');
     });
-
-    // 2. LED DINAMICI (Cambiata qui: aggiunti 'uv' e 'wind')
     const smartSensors = ['iaq', 'co2', 'pm25', 'uv', 'wind'];
-
     if (status === 'online' && data) {
         smartSensors.forEach(s => {
             const elLed = q('led-' + s);
             const elLabel = q('label-' + s);
-
-            // Assicurati che data[s] esista prima di calcolare
             const val = data[s] !== undefined ? parseFloat(data[s]) : 0;
             const info = getAQIInfo(s, val);
-
-            if (elLed) {
-                elLed.style.backgroundColor = info.c;
-                elLed.style.boxShadow = `0 0 8px ${info.c}`;
-            }
-            if (elLabel) {
-                elLabel.innerText = info.t;
-                elLabel.style.color = info.c;
-            }
+            if (elLed) { elLed.style.backgroundColor = info.c; elLed.style.boxShadow = `0 0 8px ${info.c}`; }
+            if (elLabel) { elLabel.innerText = info.t; elLabel.style.color = info.c; }
         });
     } else if (status === 'offline') {
         smartSensors.forEach(s => {
             const elLed = q('led-' + s);
             const elLabel = q('label-' + s);
-            if (elLed) {
-                elLed.style.backgroundColor = '#64748b';
-                elLed.style.boxShadow = '';
-            }
-            if (elLabel) {
-                elLabel.innerText = '--';
-                elLabel.style.color = '#64748b';
-            }
+            if (elLed) { elLed.style.backgroundColor = '#64748b'; elLed.style.boxShadow = ''; }
+            if (elLabel) { elLabel.innerText = '--'; elLabel.style.color = '#64748b'; }
         });
     }
 }
-// --- GAUGE OTTIMIZZATO PER GRIGLIA 3x3 ---
+
 function drawGauge(canvasId, val, cfg) {
     const canvas = q(canvasId); if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -145,7 +118,113 @@ function drawGauge(canvasId, val, cfg) {
     ctx.beginPath(); ctx.arc(cx, cy, 4, 0, Math.PI * 2); ctx.fillStyle = '#ffffff'; ctx.fill();
 }
 
-// --- MODALE ---
+function toggleSearch() {
+    const container = document.querySelector('.gps-search-container');
+    const input = q('addressInput');
+    if (container) container.classList.toggle('active');
+    if (container && container.classList.contains('active') && input) input.focus();
+}
+
+// NUOVA FUNZIONE DI AGGIORNAMENTO GPS BLOCCATA
+function applyGPSData() {
+    const salvataggio = localStorage.getItem('ultimaPosizione');
+    let pos = { lat: 43.0125, lon: 12.5852, nome: "Cannara (PG)" };
+    
+    if (salvataggio) {
+        const datiS = JSON.parse(salvataggio);
+        pos = { lat: datiS.lat, lon: datiS.lon, nome: datiS.nome };
+    }
+
+    if (q('localitaNome')) q('localitaNome').innerText = pos.nome;
+    if (q('gpsRaw')) q('gpsRaw').innerText = `LAT: ${pos.lat.toFixed(5)} | LON: ${pos.lon.toFixed(5)}`;
+    if (q('gpsCoordinate')) q('gpsCoordinate').innerHTML = convertiInDMS(pos.lat, pos.lon);
+}
+
+async function cercaIndirizzo() {
+    const input = q('addressInput');
+    if (!input || input.value.trim().length < 3) return;
+    try {
+        const url = `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?f=json&singleLine=${encodeURIComponent(input.value)}&maxLocations=1&sourceCountry=ITA`;
+        const response = await fetch(url);
+        const data = await response.json();
+        if (data.candidates && data.candidates.length > 0) {
+            const p = data.candidates[0];
+            localStorage.setItem('ultimaPosizione', JSON.stringify({ nome: p.address, lat: p.location.y, lon: p.location.x }));
+            applyGPSData(); // Applica subito
+            toggleSearch(); 
+            input.value = "";
+        } else { alert("Indirizzo non trovato."); }
+    } catch (error) { console.error(error); }
+}
+
+function convertiInDMS(lat, lon) {
+    const toDMS = (v) => {
+        const d = Math.floor(Math.abs(v));
+        const m = Math.floor((Math.abs(v) - d) * 60);
+        const s = ((Math.abs(v) - d - (m / 60)) * 3600).toFixed(1);
+        return `${d}° ${m}′ ${s}″`;
+    };
+    return `${toDMS(lat)} ${lat >= 0 ? 'N' : 'S'}<br>${toDMS(lon)} ${lon >= 0 ? 'E' : 'W'}`;
+}
+
+async function fetchSensorData() {
+    const wifiLed = q('wifi-led');
+    try {
+        const response = await fetch('https://api.thingspeak.com/channels/3221413/feeds/last.json');
+        if (!response.ok) throw new Error('Network error');
+        const tsData = await response.json();
+
+        const data = {
+            temp: tsData.field1, hum: tsData.field2, press_mb: tsData.field3,
+            iaq: tsData.field4, co2: tsData.field5, pm25: tsData.field6,
+            uv: tsData.field7, wind: tsData.field8,
+            ora: new Date().toLocaleTimeString('it-IT'),
+            data: new Date(tsData.created_at).toLocaleDateString('it-IT')
+        };
+
+        if (wifiLed) wifiLed.className = 'led led-online';
+        updateStatusLEDs('online', data);
+        if (q('clock')) q('clock').innerText = data.ora;
+        if (q('date')) q('date').innerText = data.data;
+
+        // RIAPPLICA SEMPRE I DATI GPS SALVATI (Così non tornano a Cannara)
+        applyGPSData();
+
+        const oraAttuale = Date.now();
+        const intervallo = getSavedInterval();
+        let deveAggiornare = (oraAttuale - lastChartUpdate >= intervallo);
+        if (deveAggiornare) lastChartUpdate = oraAttuale;
+
+        Object.keys(sensorCfg).forEach(key => {
+            const val = parseFloat(data[key]);
+            if (isNaN(val)) return;
+            const cfg = sensorCfg[key];
+            if (q(cfg.targetId)) {
+                let vDisp = (key === 'press_mb') ? val.toFixed(0) : val.toFixed(1);
+                q(cfg.targetId).innerText = vDisp + (cfg.u ? ' ' + cfg.u : '');
+            }
+            if (deveAggiornare) {
+                updateMiniChart(key, val);
+                if (['temp', 'hum', 'press_mb'].includes(key)) drawGauge('gauge' + cfg.id, val, cfg);
+            }
+            if (key === 'iaq' && q('iaqIcon')) {
+                q('iaqIcon').style.setProperty('color', getAQIInfo('iaq', val).c, 'important');
+            }
+        });
+    } catch (e) {
+        if (wifiLed) wifiLed.className = 'led led-offline';
+        updateStatusLEDs('offline');
+    }
+}
+
+function updateMiniChart(key, val) {
+    const chart = miniCharts[key]; if (!chart) return;
+    const timeLabel = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    if (chart.data.labels.length > 20) { chart.data.labels.shift(); chart.data.datasets[0].data.shift(); }
+    chart.data.labels.push(timeLabel); chart.data.datasets[0].data.push(val);
+    chart.update('none');
+}
+
 function openModal(sensor) {
     q('chartModal').style.display = 'flex';
     const cfg = sensorCfg[sensor];
@@ -158,45 +237,19 @@ function openModal(sensor) {
         data: {
             labels: miniCharts[sensor].data.labels,
             datasets: [{
-                label: cfg.id,
-                data: miniCharts[sensor].data.datasets[0].data,
-                borderColor: cfg.c,
-                backgroundColor: cfg.c + '33',
-                fill: true, tension: 0.3, pointRadius: 2
+                label: cfg.id, data: miniCharts[sensor].data.datasets[0].data,
+                borderColor: cfg.c, backgroundColor: cfg.c + '33', fill: true, tension: 0.3, pointRadius: 2
             }]
         },
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    labels: { color: '#ffffff' }
-                }
-            },
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { labels: { color: '#ffffff' } } },
             scales: {
-                x: {
-                    ticks: { color: '#ffffff' },
-                    grid: {
-                        color: 'rgba(148,163,184,0.35)'
-                    }
-                },
-                y: {
-                    ticks: { color: '#ffffff' },
-                    grid: {
-                        color: 'rgba(148,163,184,0.35)'
-                    }
-                }
+                x: { ticks: { color: '#ffffff' }, grid: { color: 'rgba(148,163,184,0.35)' } },
+                y: { ticks: { color: '#ffffff' }, grid: { color: 'rgba(148,163,184,0.35)' } }
             }
-
         }
-
     });
-}
-
-// --- LOGICA DI STAMPA ---
-function avviaStampa(campo) {
-    if (q('sideMenu')) q('sideMenu').classList.remove('active');
-    openModal(campo);
 }
 
 function eseguiStampaEffettiva() {
@@ -207,192 +260,59 @@ function eseguiStampaEffettiva() {
     bigChart.update('none');
     setTimeout(() => {
         const imgData = bigChart.toBase64Image();
-        let pImg = q('printImg');
-        if (!pImg) {
-            pImg = document.createElement('img');
-            pImg.id = 'printImg';
-            document.querySelector('#chartModal .modal-content').appendChild(pImg);
-        }
-        pImg.src = imgData;
-        pImg.style.display = 'block';
+        let pImg = q('printImg') || document.createElement('img');
+        pImg.id = 'printImg'; pImg.src = imgData; pImg.style.display = 'block';
+        document.querySelector('#chartModal .modal-content').appendChild(pImg);
         q('bigChartCanvas').style.visibility = 'hidden';
-        if (q('modalCoords')) { q('modalCoords').innerText = coordsAttuali; q('modalCoords').style.color = 'black'; }
+        
+        // Usa le coordinate attuali salvate per la stampa
+        const salvataggio = JSON.parse(localStorage.getItem('ultimaPosizione')) || {lat: 43.0125, lon: 12.5852};
+        if (q('modalCoords')) { 
+            q('modalCoords').innerText = `LAT: ${salvataggio.lat} | LON: ${salvataggio.lon}`; 
+            q('modalCoords').style.color = 'black'; 
+        }
+        
         window.print();
         setTimeout(() => {
-            if (pImg) pImg.style.display = 'none';
-            q('bigChartCanvas').style.visibility = 'visible';
-            bigChart.options.scales.x.ticks.color = '#ffffff';
-            bigChart.options.scales.y.ticks.color = '#ffffff';
-            bigChart.options.plugins.legend.labels.color = '#ffffff';
-            bigChart.update('none');
+            pImg.style.display = 'none'; q('bigChartCanvas').style.visibility = 'visible';
+            bigChart.options.scales.x.ticks.color = '#ffffff'; bigChart.options.scales.y.ticks.color = '#ffffff';
+            bigChart.options.plugins.legend.labels.color = '#ffffff'; bigChart.update('none');
             if (q('modalCoords')) q('modalCoords').style.color = 'white';
         }, 500);
     }, 250);
 }
 
-// --- FETCH E DATI (THINGSPEAK) ---
-async function fetchSensorData() {
-    const wifiLed = q('wifi-led');
-    try {
-        const response = await fetch('https://api.thingspeak.com/channels/3221413/feeds/last.json');
-        if (!response.ok) throw new Error('Network response was not ok');
-        const tsData = await response.json();
-
-        const data = {
-            temp: tsData.field1, hum: tsData.field2, press_mb: tsData.field3,
-            iaq: tsData.field4, co2: tsData.field5, pm25: tsData.field6,
-            uv: tsData.field7, wind: tsData.field8,
-            lat: "43.0125", lon: "12.5852", localita: "Cannara (PG)",
-            ora: new Date().toLocaleTimeString('it-IT'),
-            data: new Date(tsData.created_at).toLocaleDateString('it-IT')
-        };
-
-        // 1. STATO CONNESSIONE E LED/TESTI (Sempre immediati)
-        if (wifiLed) wifiLed.className = 'led led-online';
-        updateStatusLEDs('online', data);
-
-        coordsAttuali = `LAT: ${data.lat} | LON: ${data.lon}`;
-        if (q('clock')) q('clock').innerText = data.ora;
-        if (q('date')) q('date').innerText = data.data;
-        if (q('localitaNome')) q('localitaNome').innerText = data.localita;
-        if (q('gpsRaw')) q('gpsRaw').innerText = `LAT: ${data.lat} | LON: ${data.lon}`;
-        if (q('gpsCoordinate')) q('gpsCoordinate').innerHTML = `${data.lat} N<br>${data.lon} E`;
-
-        const oraAttuale = Date.now();
-        const intervallo = getSavedInterval();
-        let deveAggiornare = false;
-        if (oraAttuale - lastChartUpdate >= intervallo) { deveAggiornare = true; lastChartUpdate = oraAttuale; }
-
-        Object.keys(sensorCfg).forEach(key => {
-            const val = parseFloat(data[key]);
-            if (isNaN(val)) return;
-            const cfg = sensorCfg[key];
-
-            // 2. AGGIORNAMENTO VALORI NUMERICI (Sempre, per essere sincronizzati con i LED)
-            if (q(cfg.targetId)) {
-                let valoreDisplay = (key === 'press_mb') ? val.toFixed(0) : val.toFixed(1);
-                q(cfg.targetId).innerText = valoreDisplay + (cfg.u ? ' ' + cfg.u : '');
-            }
-
-            // 3. AGGIORNAMENTO GRAFICI E GAUGE (Solo ogni "intervallo" per non appesantire)
-            if (deveAggiornare) {
-                updateMiniChart(key, val);
-                if (key === 'temp' || key === 'hum' || key === 'press_mb') {
-                    drawGauge('gauge' + cfg.id, val, cfg);
-                }
-            }
-
-            // Icona IAQ laterale
-            if (key === 'iaq' && q('iaqIcon')) {
-                let info = getAQIInfo('iaq', val);
-                q('iaqIcon').style.setProperty('color', info.c, 'important');
-            }
-        });
-    } catch (e) {
-        console.error("Errore Fetch:", e);
-        if (wifiLed) wifiLed.className = 'led led-offline';
-        updateStatusLEDs('offline');
-    }
-}
-function updateMiniChart(key, val) {
-    const chart = miniCharts[key]; if (!chart) return;
-    const timeLabel = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    if (chart.data.labels.length > 20) { chart.data.labels.shift(); chart.data.datasets[0].data.shift(); }
-    chart.data.labels.push(timeLabel); chart.data.datasets[0].data.push(val);
-    chart.update('none');
-}
-
 async function esportaCSV() {
     try {
-        // Legge il tempo impostato sulla dashboard (da 15000ms a 14400000ms)
         const intervalloMs = getSavedInterval(); 
-        
-        let risultati = 500; 
-        let timescale = "";   
-        
-        // --- 1. CONFIGURAZIONE DINAMICA (Tabella Documentazione) ---
-        if (intervalloMs <= 15000) {        
-            risultati = 480; // 15 sec -> Ultime 2 ore
-        } else if (intervalloMs <= 30000) { 
-            risultati = 480; // 30 sec -> Ultime 4 ore
-        } else if (intervalloMs <= 60000) { 
-            risultati = 720; timescale = "&timescale=1"; // 1 min -> Ultime 12 ore
-        } else if (intervalloMs <= 300000) { 
-            risultati = 288; timescale = "&timescale=5"; // 5 min -> Ultime 24 ore
-        } else if (intervalloMs <= 600000) { 
-            risultati = 288; timescale = "&timescale=10"; // 10 min -> Ultime 48 ore
-        } else if (intervalloMs <= 1800000) { 
-            risultati = 336; timescale = "&timescale=30"; // 30 min -> 7 giorni
-        } else if (intervalloMs <= 3600000) { 
-            risultati = 360; timescale = "&timescale=60"; // 1 ora -> 15 giorni
-        } else if (intervalloMs <= 7200000) { 
-            risultati = 360; timescale = "&timescale=120"; // 2 ore -> 1 mese
-        } else {                             
-            risultati = 540; timescale = "&timescale=240"; // 4 ore -> 3 mesi
-        }
-
-        const channelID = "3221413";
-        const url = `https://api.thingspeak.com/channels/${channelID}/feeds.json?results=${risultati}${timescale}`;
-
-        const response = await fetch(url);
-        const dataJson = await response.json();
-        const feeds = dataJson.feeds;
-
-        if (!feeds || feeds.length === 0) {
-            alert("Nessun dato trovato per l'intervallo selezionato.");
-            return;
-        }
-
-        const sensoriPresenti = Object.keys(sensorCfg);
-        let csvContent = "GIORNO;MESE;ANNO;ORA;" + sensoriPresenti.map(key => sensorCfg[key].id.toUpperCase()).join(";") + "\n";
-
-        // --- 2. FILTRO DI SINCRONIZZAZIONE ---
-        // Questa parte assicura che venga scritta solo 1 riga ogni 'intervalloMs'
-        let ultimoTimestampSalvato = 0;
-
+        let risultati = 500; let timescale = "";    
+        if (intervalloMs <= 15000) risultati = 480;
+        else if (intervalloMs <= 60000) { risultati = 720; timescale = "&timescale=1"; }
+        else { risultati = 540; timescale = "&timescale=240"; }
+        const url = `https://api.thingspeak.com/channels/3221413/feeds.json?results=${risultati}${timescale}`;
+        const res = await fetch(url);
+        const feeds = (await res.json()).feeds;
+        if (!feeds || feeds.length === 0) { alert("Nessun dato trovato."); return; }
+        let csv = "GIORNO;MESE;ANNO;ORA;" + Object.keys(sensorCfg).map(k => sensorCfg[k].id.toUpperCase()).join(";") + "\n";
+        let ultimoT = 0;
         feeds.forEach(f => {
-            const dataCorrente = new Date(f.created_at);
-            const timestampCorrente = dataCorrente.getTime();
-
-            // Calcoliamo la differenza di tempo dall'ultima riga inserita
-            // Usiamo un margine di tolleranza di 2 secondi (2000ms) per piccoli ritardi di rete
-            if (timestampCorrente - ultimoTimestampSalvato < (intervalloMs - 2000)) {
-                return; // Salta questa riga: è un doppione o un invio troppo ravvicinato
-            }
-
-            ultimoTimestampSalvato = timestampCorrente;
-
-            const giorno = String(dataCorrente.getDate()).padStart(2, '0');
-            const mese = String(dataCorrente.getMonth() + 1).padStart(2, '0');
-            const anno = dataCorrente.getFullYear();
-            const ora = dataCorrente.getHours().toString().padStart(2, '0') + ":" + 
-                        dataCorrente.getMinutes().toString().padStart(2, '0') + ":" + 
-                        dataCorrente.getSeconds().toString().padStart(2, '0');
-
-            let riga = [giorno, mese, anno, ora];
-            const fields = [f.field1, f.field2, f.field3, f.field4, f.field5, f.field6, f.field7, f.field8];
-            
-            fields.forEach(val => {
-                let valFmt = (val !== undefined && val !== null) ? val.toString().replace('.', ',') : "";
-                riga.push(valFmt);
-            });
-            
-            csvContent += riga.join(";") + "\n";
+            const d = new Date(f.created_at);
+            const t = d.getTime();
+            if (t - ultimoT < (intervalloMs - 2000)) return;
+            ultimoT = t;
+            const riga = [
+                String(d.getDate()).padStart(2, '0'), String(d.getMonth() + 1).padStart(2, '0'), d.getFullYear(),
+                d.getHours().toString().padStart(2, '0') + ":" + d.getMinutes().toString().padStart(2, '0') + ":" + d.getSeconds().toString().padStart(2, '0'),
+                f.field1, f.field2, f.field3, f.field4, f.field5, f.field6, f.field7, f.field8
+            ].map(v => v?.toString().replace('.', ',')).join(";");
+            csv += riga + "\n";
         });
-
-        // --- 3. DOWNLOAD DEL FILE ---
-        const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
-        link.setAttribute("download", `Report_Meteo_Sincro.csv`);
-        document.body.appendChild(link);
+        link.setAttribute("download", `Report_Meteo.csv`);
         link.click();
-        document.body.removeChild(link);
-
-    } catch (err) {
-        console.error("Errore esportazione:", err);
-        alert("Si è verificato un errore durante il download del CSV.");
-    }
+    } catch (e) { alert("Errore download."); }
 }
 
 function initCharts() {
@@ -400,65 +320,31 @@ function initCharts() {
         const canvas = q('mini' + sensorCfg[k].id); if (!canvas) return;
         miniCharts[k] = new Chart(canvas.getContext('2d'), {
             type: 'line',
-            data: {
-                labels: [],
-                datasets: [{
-                    data: [],
-                    borderColor: sensorCfg[k].c,
-                    borderWidth: 2,
-                    pointRadius: 0,
-                    fill: false
-                }]
-            },
+            data: { labels: [], datasets: [{ data: [], borderColor: sensorCfg[k].c, borderWidth: 2, pointRadius: 0, fill: false }] },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false }
-                },
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
                 scales: {
-                    x: {
-                        display: true,
-                        ticks: {
-                            color: '#ffffff',
-                            font: { size: 8 }
-                        },
-                        grid: {
-                            color: 'rgba(148,163,184,0.45)'
-                        }
-                    },
-                    y: {
-                        display: true,
-                        ticks: {
-                            color: '#ffffff',
-                            font: { size: 8 }
-                        },
-                        grid: {
-                            color: 'rgba(148,163,184,0.45)'
-                        }
-                    }
+                    x: { display: true, ticks: { color: '#ffffff', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.45)' } },
+                    y: { display: true, ticks: { color: '#ffffff', font: { size: 8 } }, grid: { color: 'rgba(148,163,184,0.45)' } }
                 }
             }
         });
-
     });
 }
 
 function caricaPreferenzeUtente() {
-    const sensori = ['temp', 'hum', 'press_mb', 'iaq', 'co2', 'pm25', 'uv', 'wind', 'gps'];
-    sensori.forEach(s => {
+    ['temp', 'hum', 'press_mb', 'iaq', 'co2', 'pm25', 'uv', 'wind', 'gps'].forEach(s => {
         let stato = localStorage.getItem('show_' + s);
-        const div = document.getElementById('block-' + s);
-        if (div && stato !== null) div.style.setProperty('display', (stato === 'false' ? 'none' : 'flex'), 'important');
+        if (q('block-' + s) && stato !== null) q('block-' + s).style.setProperty('display', (stato === 'false' ? 'none' : 'flex'), 'important');
     });
 }
 
 window.addEventListener('resize', () => {
-    Object.keys(sensorCfg).forEach(key => {
-        const cfg = sensorCfg[key];
-        const valTxt = q(cfg.targetId)?.innerText;
-        if (valTxt && (key === 'temp' || key === 'hum' || key === 'press_mb')) {
-            drawGauge('gauge' + cfg.id, parseFloat(valTxt), cfg);
+    Object.keys(sensorCfg).forEach(k => {
+        if (['temp', 'hum', 'press_mb'].includes(k)) {
+            const val = parseFloat(q(sensorCfg[k].targetId)?.innerText);
+            if (!isNaN(val)) drawGauge('gauge' + sensorCfg[k].id, val, sensorCfg[k]);
         }
     });
 });
@@ -466,9 +352,11 @@ window.addEventListener('resize', () => {
 document.addEventListener('DOMContentLoaded', async () => {
     initCharts();
     caricaPreferenzeUtente();
+    applyGPSData(); // Carica subito la posizione salvata
     await fetchSensorData();
-    setInterval(async () => { await fetchSensorData(); }, 1000);
+    setInterval(fetchSensorData, 1000); 
 });
 
 function closeModal() { q('chartModal').style.display = 'none'; }
 function toggleMenu() { q('sideMenu').classList.toggle('active'); }
+function avviaStampa(campo) { if (q('sideMenu')) q('sideMenu').classList.remove('active'); openModal(campo); } 
