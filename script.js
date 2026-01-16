@@ -2,7 +2,7 @@ const q = id => document.getElementById(id);
 let miniCharts = {};
 let bigChart = null;
 let lastChartUpdate = 0;
-let isManualLocation = false; 
+let isManualLocation = false;
 
 function getSavedInterval() {
     const saved = localStorage.getItem('updateInterval');
@@ -127,14 +127,26 @@ function toggleSearch() {
 
 // NUOVA FUNZIONE DI AGGIORNAMENTO GPS BLOCCATA
 function applyGPSData() {
+    // Prova a recuperare i dati salvati
     const salvataggio = localStorage.getItem('ultimaPosizione');
+
+    // Valore di default (Cannara)
     let pos = { lat: 43.0125, lon: 12.5852, nome: "Cannara (PG)" };
-    
+
+    // Se esiste un salvataggio, sovrascrivi il default
     if (salvataggio) {
-        const datiS = JSON.parse(salvataggio);
-        pos = { lat: datiS.lat, lon: datiS.lon, nome: datiS.nome };
+        try {
+            const datiS = JSON.parse(salvataggio);
+            // Verifica che i dati siano validi prima di usarli
+            if (datiS && datiS.lat && datiS.lon) {
+                pos = datiS;
+            }
+        } catch (e) {
+            console.error("Errore nel parsing della posizione salvata", e);
+        }
     }
 
+    // Aggiorna l'interfaccia con i dati (salvati o di default)
     if (q('localitaNome')) q('localitaNome').innerText = pos.nome;
     if (q('gpsRaw')) q('gpsRaw').innerText = `LAT: ${pos.lat.toFixed(5)} | LON: ${pos.lon.toFixed(5)}`;
     if (q('gpsCoordinate')) q('gpsCoordinate').innerHTML = convertiInDMS(pos.lat, pos.lon);
@@ -142,19 +154,43 @@ function applyGPSData() {
 
 async function cercaIndirizzo() {
     const input = q('addressInput');
-    if (!input || input.value.trim().length < 3) return;
+    if (!input || input.value.trim().length < 3) {
+        console.log("Inserire almeno 3 caratteri");
+        return;
+    }
+
+    console.log("Ricerca in corso per:", input.value);
+
     try {
+        // Usiamo un servizio di geocodifica gratuito
         const url = `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?f=json&singleLine=${encodeURIComponent(input.value)}&maxLocations=1&sourceCountry=ITA`;
+        
         const response = await fetch(url);
         const data = await response.json();
+
         if (data.candidates && data.candidates.length > 0) {
             const p = data.candidates[0];
-            localStorage.setItem('ultimaPosizione', JSON.stringify({ nome: p.address, lat: p.location.y, lon: p.location.x }));
-            applyGPSData(); // Applica subito
-            toggleSearch(); 
-            input.value = "";
-        } else { alert("Indirizzo non trovato."); }
-    } catch (error) { console.error(error); }
+            
+            // Salvataggio preciso nel localStorage
+            const nuovaPosizione = { 
+                nome: p.address, 
+                lat: p.location.y, 
+                lon: p.location.x 
+            };
+            
+            localStorage.setItem('ultimaPosizione', JSON.stringify(nuovaPosizione));
+            console.log("Posizione salvata:", nuovaPosizione);
+
+            applyGPSData(); // Aggiorna subito l'interfaccia
+            toggleSearch(); // Chiude la barra di ricerca
+            input.value = ""; // Pulisce il campo
+        } else {
+            alert("Indirizzo non trovato. Prova ad aggiungere la città (es: Via Roma, Milano)");
+        }
+    } catch (error) {
+        console.error("Errore durante la ricerca:", error);
+        alert("Errore nel servizio di ricerca.");
+    }
 }
 
 function convertiInDMS(lat, lon) {
@@ -264,14 +300,14 @@ function eseguiStampaEffettiva() {
         pImg.id = 'printImg'; pImg.src = imgData; pImg.style.display = 'block';
         document.querySelector('#chartModal .modal-content').appendChild(pImg);
         q('bigChartCanvas').style.visibility = 'hidden';
-        
+
         // Usa le coordinate attuali salvate per la stampa
-        const salvataggio = JSON.parse(localStorage.getItem('ultimaPosizione')) || {lat: 43.0125, lon: 12.5852};
-        if (q('modalCoords')) { 
-            q('modalCoords').innerText = `LAT: ${salvataggio.lat} | LON: ${salvataggio.lon}`; 
-            q('modalCoords').style.color = 'black'; 
+        const salvataggio = JSON.parse(localStorage.getItem('ultimaPosizione')) || { lat: 43.0125, lon: 12.5852 };
+        if (q('modalCoords')) {
+            q('modalCoords').innerText = `LAT: ${salvataggio.lat} | LON: ${salvataggio.lon}`;
+            q('modalCoords').style.color = 'black';
         }
-        
+
         window.print();
         setTimeout(() => {
             pImg.style.display = 'none'; q('bigChartCanvas').style.visibility = 'visible';
@@ -284,8 +320,8 @@ function eseguiStampaEffettiva() {
 
 async function esportaCSV() {
     try {
-        const intervalloMs = getSavedInterval(); 
-        let risultati = 500; let timescale = "";    
+        const intervalloMs = getSavedInterval();
+        let risultati = 500; let timescale = "";
         if (intervalloMs <= 15000) risultati = 480;
         else if (intervalloMs <= 60000) { risultati = 720; timescale = "&timescale=1"; }
         else { risultati = 540; timescale = "&timescale=240"; }
@@ -354,7 +390,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     caricaPreferenzeUtente();
     applyGPSData(); // Carica subito la posizione salvata
     await fetchSensorData();
-    setInterval(fetchSensorData, 1000); 
+    setInterval(fetchSensorData, 1000);
 });
 
 function closeModal() { q('chartModal').style.display = 'none'; }
