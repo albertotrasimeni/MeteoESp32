@@ -3,6 +3,8 @@ let miniCharts = {};
 let bigChart = null;
 let lastChartUpdate = 0;
 let isManualLocation = false;
+let tempoInizioRicercaAntenna = null; // Memorizza quando inizia la ricerca antenna 
+let ricercaManualeSuggerita = false;  // Evita che il messaggio appaia ripetutamente
 
 function getSavedInterval() {
     const saved = localStorage.getItem('updateInterval');
@@ -126,30 +128,63 @@ function toggleSearch() {
 }
 
 // NUOVA FUNZIONE DI AGGIORNAMENTO GPS BLOCCATA
-function applyGPSData() {
-    // Prova a recuperare i dati salvati
-    const salvataggio = localStorage.getItem('ultimaPosizione');
+async function aggiornaPosizioneGPS() {
+    const localitaEl = document.getElementById("localitaNome");
+    const gpsCoordEl = document.getElementById("gpsCoordinate");
+    const ESP_URL = "http://meteo.local/api/data"; 
 
-    // Valore di default (Cannara)
-    let pos = { lat: 43.0125, lon: 12.5852, nome: "Cannara (PG)" };
+    try {
+        const response = await fetch(ESP_URL, { mode: 'cors', cache: 'no-store' });
+        const data = await response.json();
+        
+        const oraAttuale = Date.now();
+        const millisecondiDallAvvio = oraAttuale - tempoInizioDashboard;
 
-    // Se esiste un salvataggio, sovrascrivi il default
-    if (salvataggio) {
-        try {
-            const datiS = JSON.parse(salvataggio);
-            // Verifica che i dati siano validi prima di usarli
-            if (datiS && datiS.lat && datiS.lon) {
-                pos = datiS;
+        if (millisecondiDallAvvio < 6000) {
+            if (localitaEl) localitaEl.innerHTML = `<span style="color:#facc15;font-weight:bold;"><i class="fas fa-sync fa-spin"></i> Avvio Gps....</span>`;
+            return; 
+        }
+
+        if (data.lat === "0.0" || parseFloat(data.lat) === 0) {
+            if (!tempoInizioRicercaAntenna) tempoInizioRicercaAntenna = oraAttuale;
+
+            if (localitaEl) localitaEl.innerHTML = `<span style="color:#facc15;font-weight:bold;"><i class="fas fa-satellite-dish fa-spin"></i> GPS: Ricerca antenna</span>`;
+
+            // TEST RAPIDO: 10 secondi (10000 ms) invece di 20 minuti
+            if (oraAttuale - tempoInizioRicercaAntenna >1200000 && !ricercaManualeSuggerita) {
+                ricercaManualeSuggerita = true;
+                toggleSearch(); 
             }
-        } catch (e) {
-            console.error("Errore nel parsing della posizione salvata", e);
+            
+            const salvata = localStorage.getItem('ultimaPosizioneValida');
+            if (salvata && gpsCoordEl) {
+                const d = JSON.parse(salvata);
+                gpsCoordEl.innerHTML = `<small style="color:#94a3b8;">Ultimo fix: ${parseFloat(d.lat).toFixed(4)}, ${parseFloat(d.lon).toFixed(4)}</small>`;
+            }
+        } else {
+            tempoInizioRicercaAntenna = null;
+            ricercaManualeSuggerita = false;
+            // ... resto della logica fix (indirizzo e coordinate) ...
+            const lat = parseFloat(data.lat);
+            const lon = parseFloat(data.lon);
+            if (lat !== ultimaLat || lon !== ultimaLon) {
+                indirizzoSalvato = await ottieniIndirizzoTestuale(lat, lon);
+                ultimaLat = lat; ultimaLon = lon;
+                localStorage.setItem('ultimaPosizioneValida', JSON.stringify({lat, lon, localita: indirizzoSalvato}));
+            }
+            if (localitaEl) localitaEl.innerHTML = `<span style="color:#4ade80;font-weight:bold;">📍 ${indirizzoSalvato}</span>`;
+            if (gpsCoordEl) gpsCoordEl.innerHTML = convertiInDMS(lat, lon);
+        }
+    } catch (err) {
+        console.warn("ESP32 Offline - Avvio timer emergenza");
+        if (!tempoInizioRicercaAntenna) tempoInizioRicercaAntenna = Date.now();
+        
+        // TEST RAPIDO ANCHE PER STATO OFFLINE: 10 secondi
+        if (Date.now() - tempoInizioRicercaAntenna > 10000 && !ricercaManualeSuggerita) {
+            ricercaManualeSuggerita = true;
+            toggleSearch(); 
         }
     }
-
-    // Aggiorna l'interfaccia con i dati (salvati o di default)
-    if (q('localitaNome')) q('localitaNome').innerText = pos.nome;
-    if (q('gpsRaw')) q('gpsRaw').innerText = `LAT: ${pos.lat.toFixed(5)} | LON: ${pos.lon.toFixed(5)}`;
-    if (q('gpsCoordinate')) q('gpsCoordinate').innerHTML = convertiInDMS(pos.lat, pos.lon);
 }
 
 async function cercaIndirizzo() {
@@ -164,20 +199,20 @@ async function cercaIndirizzo() {
     try {
         // Usiamo un servizio di geocodifica gratuito
         const url = `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?f=json&singleLine=${encodeURIComponent(input.value)}&maxLocations=1&sourceCountry=ITA`;
-        
+
         const response = await fetch(url);
         const data = await response.json();
 
         if (data.candidates && data.candidates.length > 0) {
             const p = data.candidates[0];
-            
+
             // Salvataggio preciso nel localStorage
-            const nuovaPosizione = { 
-                nome: p.address, 
-                lat: p.location.y, 
-                lon: p.location.x 
+            const nuovaPosizione = {
+                nome: p.address,
+                lat: p.location.y,
+                lon: p.location.x
             };
-            
+
             localStorage.setItem('ultimaPosizione', JSON.stringify(nuovaPosizione));
             console.log("Posizione salvata:", nuovaPosizione);
 
@@ -224,7 +259,7 @@ async function fetchSensorData() {
         if (q('date')) q('date').innerText = data.data;
 
         // RIAPPLICA SEMPRE I DATI GPS SALVATI (Così non tornano a Cannara)
-        applyGPSData();
+       //applyGPSData();
 
         const oraAttuale = Date.now();
         const intervallo = getSavedInterval();
@@ -388,11 +423,200 @@ window.addEventListener('resize', () => {
 document.addEventListener('DOMContentLoaded', async () => {
     initCharts();
     caricaPreferenzeUtente();
-    applyGPSData(); // Carica subito la posizione salvata
+    
+    // 1. Prima proviamo a caricare l'ultima posizione nota dal browser (cache)
+    applyGPSData(); 
+    
+    // 2. Chiamiamo immediatamente l'ESP32 per i dati reali (sovrascriverà la cache o "Cannara")
+    aggiornaPosizioneGPS(); 
+    
+    // 3. Carichiamo i dati dei sensori da ThingSpeak
     await fetchSensorData();
+    
+    // Timer per aggiornamento sensori (1 secondo)
     setInterval(fetchSensorData, 1000);
 });
 
+// 2. FUNZIONI DI UTILITÀ (Mettila qui!)
+async function ottieniIndirizzoTestuale(lat, lon) {
+    try {
+        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`, {
+            headers: { 'Accept-Language': 'it' }
+        });
+        const data = await response.json();
+        const addr = data.address;
+        const citta = addr.city || addr.town || addr.village || addr.municipality || "Località sconosciuta";
+        const via = addr.road || addr.suburb || "";
+        return via ? `${via}, ${citta}` : citta;
+    } catch (error) {
+        console.error("Errore geocoding:", error);
+        return "Indirizzo non disponibile";
+    }
+}
+
+// === GESTIONE BLOCCO POSIZIONE GPS (ESP32 via mDNS) ===
+const ESP_HOST = "http://meteo.local";  // oppure "http://192.168.x.x"
+const GPS_ENDPOINT = "http://meteo.local/api/data";
+
+let ultimaLat = 0;
+let ultimaLon = 0;
+let indirizzoSalvato = "";
+
+// Aggiungi queste variabili in alto nel file script.js
+let tempoInizioDashboard = Date.now();
+let faseInizialeCompletata = false;
+
+// --- 1. FUNZIONE DI VISUALIZZAZIONE (Da aggiungere) ---
+function applyGPSData() {
+    const manuale = localStorage.getItem('ultimaPosizione');
+    const automatico = localStorage.getItem('ultimaPosizioneValida');
+    const datiSalvati = manuale || automatico;
+
+    if (datiSalvati) {
+        try {
+            const pos = JSON.parse(datiSalvati);
+            if (pos && pos.lat && pos.lon) {
+                if (q('localitaNome')) q('localitaNome').innerText = pos.nome || pos.localita || "Posizione impostata";
+                if (q('gpsRaw')) q('gpsRaw').innerText = `LAT: ${parseFloat(pos.lat).toFixed(5)} | LON: ${parseFloat(pos.lon).toFixed(5)}`;
+                if (q('gpsCoordinate')) q('gpsCoordinate').innerHTML = convertiInDMS(pos.lat, pos.lon);
+            }
+        } catch (e) {
+            console.error("Errore GPS:", e);
+        }
+    }
+}
+
+// Incolla qui la nuova funzione
+function chiudiSearchSeAperta() {
+    const searchBar = document.getElementById('search-bar'); 
+    // Se la tua barra di ricerca ha un ID o una classe diversa, modificali qui
+    if (searchBar && searchBar.classList.contains('active')) {
+        toggleSearch(); // Chiama la tua funzione esistente per chiuderla
+    }
+}
+
+// ... fine del file o altre funzioni ...
+
+
+async function aggiornaPosizioneGPS() {
+    const localitaEl = document.getElementById("localitaNome");
+    const gpsCoordEl = document.getElementById("gpsCoordinate");
+    const gpsRawEl = document.getElementById("gpsRaw"); // Punta ai trattini LAT: -- | LON: --
+    const ESP_URL = "http://meteo.local/api/data"; 
+
+    try {
+        const response = await fetch(ESP_URL, { mode: 'cors', cache: 'no-store' });
+        const data = await response.json();
+        
+        const oraAttuale = Date.now();
+        const millisecondiDallAvvio = oraAttuale - tempoInizioDashboard;
+
+        // --- 1. FASE AVVIO (Primi 6 secondi) ---
+        if (millisecondiDallAvvio < 6000) {
+            if (localitaEl) localitaEl.innerHTML = `<span style="color:#facc15;font-weight:bold;"><i class="fas fa-sync fa-spin"></i> Avvio Gps....</span>`;
+            return; 
+        }
+
+        // --- 2. FASE RICERCA ANTENNA (Latitudine 0.0) ---
+        if (data.lat === "0.0" || parseFloat(data.lat) === 0) {
+            if (!tempoInizioRicercaAntenna) {
+                tempoInizioRicercaAntenna = Date.now();
+            }
+
+            if (localitaEl) {
+                localitaEl.innerHTML = `<span style="color:#facc15;font-weight:bold;"><i class="fas fa-satellite-dish fa-spin"></i> GPS: Ricerca antenna</span>`;
+            }
+
+            // Se passano 20 minuti, apre la ricerca manuale
+            if (Date.now() - tempoInizioRicercaAntenna > 1200000 && !ricercaManualeSuggerita) {
+                ricercaManualeSuggerita = true;
+                toggleSearch(); 
+            }
+            
+            applyGPSData(); // Mostra i dati memorizzati
+        } 
+        
+        // --- 3. FASE FIX OTTENUTO (Segnale valido) ---
+        else {
+            tempoInizioRicercaAntenna = null; 
+            ricercaManualeSuggerita = false;
+
+            // Reset: chiude la lentina e cancella indirizzo manuale temporaneo
+            localStorage.removeItem('ultimaPosizione'); 
+            chiudiSearchSeAperta(); 
+
+            const lat = parseFloat(data.lat);
+            const lon = parseFloat(data.lon);
+
+            // AGGIORNAMENTO COORDINATE DECIMALI (Sostituisce i trattini -- )
+            if (gpsRawEl) {
+                gpsRawEl.innerText = `LAT: ${lat.toFixed(5)} | LON: ${lon.toFixed(5)}`;
+            }
+
+            // Aggiorna indirizzo e DMS solo se la posizione è cambiata
+            if (lat !== ultimaLat || lon !== ultimaLon) {
+                const indirizzo = await ottieniIndirizzoTestuale(lat, lon);
+                
+                if (localitaEl) localitaEl.innerHTML = `<span style="color:#4ade80;font-weight:bold;">📍 ${indirizzo}</span>`;
+                if (gpsCoordEl) gpsCoordEl.innerHTML = convertiInDMS(lat, lon);
+                
+                // Salva come ultima posizione valida automatica
+                localStorage.setItem('ultimaPosizioneValida', JSON.stringify({
+                    lat: lat, lon: lon, localita: indirizzo
+                }));
+                
+                ultimaLat = lat; 
+                ultimaLon = lon;
+            }
+        }
+
+    } catch (err) {
+        // --- 4. FASE ERRORE (ESP spento o offline) ---
+        const millisecondiDallAvvio = Date.now() - tempoInizioDashboard;
+        if (millisecondiDallAvvio > 6000) {
+            if (!tempoInizioRicercaAntenna) tempoInizioRicercaAntenna = Date.now();
+            
+            if (localitaEl) {
+                localitaEl.innerHTML = `<span style="color:#ef4444;font-weight:bold;"><i class="fas fa-plug"></i> GPS: Modulo Offline</span>`;
+            }
+
+            applyGPSData();
+
+            if (Date.now() - tempoInizioRicercaAntenna > 1200000 && !ricercaManualeSuggerita) {
+                ricercaManualeSuggerita = true;
+                toggleSearch(); 
+            }
+        }
+    }
+}
+
+setInterval(aggiornaPosizioneGPS, 10000);
+
+document.addEventListener('DOMContentLoaded', async () => {
+    // 1. Facciamo partire il cronometro immediatamente
+    tempoInizioDashboard = Date.now(); 
+    
+    initCharts();
+    caricaPreferenzeUtente();
+    
+    // 2. Placeholder immediato per evitare di vedere "Cannara" o campi vuoti
+    if (q('localitaNome')) q('localitaNome').innerHTML = `<i class="fas fa-spinner fa-spin"></i> Caricamento...`;
+
+    // 3. Eseguiamo il primo controllo GPS (entrerà nella FASE 1 dei 6 secondi)
+    await aggiornaPosizioneGPS(); 
+    
+    // 4. Carichiamo i dati dai sensori cloud
+    await fetchSensorData();
+    
+    // 5. Impostiamo i timer di aggiornamento
+    // Controllo GPS ogni 2 secondi per gestire i cambi di stato (Avvio -> Ricerca -> Fix)
+    setInterval(aggiornaPosizioneGPS, 2000);
+    
+    // Aggiornamento dati ThingSpeak ogni 15 secondi (o quanto impostato)
+    setInterval(fetchSensorData, getSavedInterval());
+});
+
+// --- le righe successive del tuo file ---
 function closeModal() { q('chartModal').style.display = 'none'; }
 function toggleMenu() { q('sideMenu').classList.toggle('active'); }
 function avviaStampa(campo) { if (q('sideMenu')) q('sideMenu').classList.remove('active'); openModal(campo); } 

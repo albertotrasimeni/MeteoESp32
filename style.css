@@ -402,7 +402,6 @@ body {
     color: var(--accent);
 }
 
-/* Fix per il testo della località (Azzurro e Grassetto) */
 #localitaNome {
     color: #38bdf8;
     font-size: 1.2rem;
@@ -411,10 +410,31 @@ body {
     display: block;
     word-wrap: break-word;
     line-height: 1.2;
+    
+    /* CORREZIONI PER IL CENTRAMENTO */
+    text-align: center;       /* Forza il testo al centro su ogni riga */
+    width: 100%;             /* Occupa tutta la larghezza per calcolare il centro */
+    margin-bottom: 12px;     /* Crea uno spazio armonioso con i numeri sotto */
 }
 
 /* Evita che il titolo della card copra la barra di ricerca */
 #block-gps .card-header {
     position: relative !important;
     overflow: visible !important;
+}
+
+/* Evita che il titolo della card copra la barra di ricerca */
+#block-gps .card-header {
+    position: relative !important;
+    overflow: visible !important;
+}
+
+/* Stile per le coordinate decimali grezze */
+#gpsRaw {
+    font-size: 0.75rem !important; /* Testo piccolo per stare su una riga */
+    color: var(--text-dim);        /* Colore grigio discreto */
+    margin-top: 5px;               /* Distanza dalle coordinate DMS */
+    opacity: 0.8;
+    display: block;
+    text-align: center;            /* Centrato sotto le DMS */
 }
