@@ -3,7 +3,11 @@ let miniCharts = {};
 let bigChart = null;
 let lastChartUpdate = 0;
 let isManualLocation = false;
-
+let tempoInizioRicercaAntenna = null; 
+let ricercaManualeSuggerita = false;  
+let tempoInizioDashboard = Date.now();
+let ultimaLat = 0;
+let ultimaLon = 0;
 
 function getSavedInterval() {
     const saved = localStorage.getItem('updateInterval');
@@ -20,6 +24,24 @@ const sensorCfg = {
     uv: { id: 'Uv', c: '#fbbf24', u: 'Index', targetId: 'uvValue' },
     wind: { id: 'Wind', c: '#0ea5e9', u: 'km/h', targetId: 'windValue' }
 };
+
+// --- LOGICA GPS UNIFICATA (SENZA DOPPIONI) ---
+
+function applyGPSData() {
+    const manuale = localStorage.getItem('ultimaPosizione');
+    const automatico = localStorage.getItem('ultimaPosizioneValida');
+    const datiSalvati = manuale || automatico;
+    if (datiSalvati) {
+        try {
+            const pos = JSON.parse(datiSalvati);
+            if (pos && pos.lat) {
+                if (q('localitaNome')) q('localitaNome').innerText = pos.nome || pos.localita || "Posizione salvata";
+                if (q('gpsRaw')) q('gpsRaw').innerText = `LAT: ${parseFloat(pos.lat).toFixed(5)} | LON: ${parseFloat(pos.lon).toFixed(5)}`;
+                if (q('gpsCoordinate')) q('gpsCoordinate').innerHTML = convertiInDMS(pos.lat, pos.lon);
+            }
+        } catch (e) { console.error("Errore cache GPS:", e); }
+    }
+}
 
 function getAQIInfo(tipo, val) {
     if (tipo === 'iaq') {
@@ -126,72 +148,20 @@ function toggleSearch() {
     if (container && container.classList.contains('active') && input) input.focus();
 }
 
-// NUOVA FUNZIONE DI AGGIORNAMENTO GPS BLOCCATA
-function applyGPSData() {
-    // Prova a recuperare i dati salvati
-    const salvataggio = localStorage.getItem('ultimaPosizione');
-
-    // Valore di default (Cannara)
-    let pos = { lat: 43.0125, lon: 12.5852, nome: "Cannara (PG)" };
-
-    // Se esiste un salvataggio, sovrascrivi il default
-    if (salvataggio) {
-        try {
-            const datiS = JSON.parse(salvataggio);
-            // Verifica che i dati siano validi prima di usarli
-            if (datiS && datiS.lat && datiS.lon) {
-                pos = datiS;
-            }
-        } catch (e) {
-            console.error("Errore nel parsing della posizione salvata", e);
-        }
-    }
-
-    // Aggiorna l'interfaccia con i dati (salvati o di default)
-    if (q('localitaNome')) q('localitaNome').innerText = pos.nome;
-    if (q('gpsRaw')) q('gpsRaw').innerText = `LAT: ${pos.lat.toFixed(5)} | LON: ${pos.lon.toFixed(5)}`;
-    if (q('gpsCoordinate')) q('gpsCoordinate').innerHTML = convertiInDMS(pos.lat, pos.lon);
-}
-
 async function cercaIndirizzo() {
     const input = q('addressInput');
-    if (!input || input.value.trim().length < 3) {
-        console.log("Inserire almeno 3 caratteri");
-        return;
-    }
-
-    console.log("Ricerca in corso per:", input.value);
-
+    if (!input || input.value.trim().length < 3) return;
     try {
-        // Usiamo un servizio di geocodifica gratuito
         const url = `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?f=json&singleLine=${encodeURIComponent(input.value)}&maxLocations=1&sourceCountry=ITA`;
-
         const response = await fetch(url);
         const data = await response.json();
-
         if (data.candidates && data.candidates.length > 0) {
             const p = data.candidates[0];
-
-            // Salvataggio preciso nel localStorage
-            const nuovaPosizione = {
-                nome: p.address,
-                lat: p.location.y,
-                lon: p.location.x
-            };
-
+            const nuovaPosizione = { nome: p.address, lat: p.location.y, lon: p.location.x };
             localStorage.setItem('ultimaPosizione', JSON.stringify(nuovaPosizione));
-            console.log("Posizione salvata:", nuovaPosizione);
-
-            applyGPSData(); // Aggiorna subito l'interfaccia
-            toggleSearch(); // Chiude la barra di ricerca
-            input.value = ""; // Pulisce il campo
-        } else {
-            alert("Indirizzo non trovato. Prova ad aggiungere la città (es: Via Roma, Milano)");
-        }
-    } catch (error) {
-        console.error("Errore durante la ricerca:", error);
-        alert("Errore nel servizio di ricerca.");
-    }
+            applyGPSData(); toggleSearch(); input.value = "";
+        } else { alert("Indirizzo non trovato."); }
+    } catch (error) { console.error("Errore ricerca:", error); }
 }
 
 function convertiInDMS(lat, lon) {
@@ -210,7 +180,6 @@ async function fetchSensorData() {
         const response = await fetch('https://api.thingspeak.com/channels/3221413/feeds/last.json');
         if (!response.ok) throw new Error('Network error');
         const tsData = await response.json();
-
         const data = {
             temp: tsData.field1, hum: tsData.field2, press_mb: tsData.field3,
             iaq: tsData.field4, co2: tsData.field5, pm25: tsData.field6,
@@ -218,20 +187,14 @@ async function fetchSensorData() {
             ora: new Date().toLocaleTimeString('it-IT'),
             data: new Date(tsData.created_at).toLocaleDateString('it-IT')
         };
-
         if (wifiLed) wifiLed.className = 'led led-online';
         updateStatusLEDs('online', data);
         if (q('clock')) q('clock').innerText = data.ora;
         if (q('date')) q('date').innerText = data.data;
-
-        // RIAPPLICA SEMPRE I DATI GPS SALVATI (Così non tornano a Cannara)
-       //applyGPSData();
-
         const oraAttuale = Date.now();
         const intervallo = getSavedInterval();
         let deveAggiornare = (oraAttuale - lastChartUpdate >= intervallo);
         if (deveAggiornare) lastChartUpdate = oraAttuale;
-
         Object.keys(sensorCfg).forEach(key => {
             const val = parseFloat(data[key]);
             if (isNaN(val)) return;
@@ -301,14 +264,11 @@ function eseguiStampaEffettiva() {
         pImg.id = 'printImg'; pImg.src = imgData; pImg.style.display = 'block';
         document.querySelector('#chartModal .modal-content').appendChild(pImg);
         q('bigChartCanvas').style.visibility = 'hidden';
-
-        // Usa le coordinate attuali salvate per la stampa
-        const salvataggio = JSON.parse(localStorage.getItem('ultimaPosizione')) || { lat: 43.0125, lon: 12.5852 };
+        const salvataggio = JSON.parse(localStorage.getItem('ultimaPosizioneValida')) || { lat: 0, lon: 0 };
         if (q('modalCoords')) {
             q('modalCoords').innerText = `LAT: ${salvataggio.lat} | LON: ${salvataggio.lon}`;
             q('modalCoords').style.color = 'black';
         }
-
         window.print();
         setTimeout(() => {
             pImg.style.display = 'none'; q('bigChartCanvas').style.visibility = 'visible';
@@ -386,102 +346,69 @@ window.addEventListener('resize', () => {
     });
 });
 
+async function ottieniIndirizzoTestuale(lat, lon) {
+    try {
+        // ArcGIS è gratuito e molto preciso per i civici in Italia
+        const url = `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/reverseGeocode?f=pjson&location=${lon},${lat}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data && data.address) {
+            // Address contiene "Via Amedeo di Savoia 79", City contiene "Cannara"
+            const via = data.address.Address || ""; 
+            const comune = data.address.City || "";  
+            
+            return via ? `${via}, ${comune}` : comune;
+        }
+        return "Indirizzo non disponibile";
+    } catch (e) { 
+        return "Indirizzo non disponibile"; 
+    }
+}
+
+// AGGIUNGO LA FUNZIONE MANCANTE CHE RICHIAMI IN FONDO
+async function aggiornaPosizioneGPS() {
+    const localitaEl = q("localitaNome");
+    const gpsCoordEl = q("gpsCoordinate");
+    const gpsRawEl = q("gpsRaw");
+    try {
+        const response = await fetch("http://meteo.local/api/data", { mode: 'cors', cache: 'no-store' });
+        const data = await response.json();
+        
+        if (!data.lat || parseFloat(data.lat) === 0) {
+            applyGPSData();
+            return;
+        }
+
+        const lat = parseFloat(data.lat); 
+        const lon = parseFloat(data.lon);
+
+        if (lat.toFixed(4) !== ultimaLat.toFixed(4) || lon.toFixed(4) !== ultimaLon.toFixed(4)) {
+            let indirizzo = await ottieniIndirizzoTestuale(lat, lon);
+            if (localitaEl) localitaEl.innerHTML = `<span style="color:#4ade80;font-weight:bold;">📍 ${indirizzo}</span>`;
+            if (gpsRawEl) gpsRawEl.innerText = `LAT: ${lat.toFixed(5)} | LON: ${lon.toFixed(5)}`;
+            if (gpsCoordEl) gpsCoordEl.innerHTML = convertiInDMS(lat, lon);
+            
+            localStorage.setItem('ultimaPosizioneValida', JSON.stringify({ lat, lon, localita: indirizzo }));
+            ultimaLat = lat; 
+            ultimaLon = lon;
+        }
+    } catch (err) {
+        applyGPSData();
+    }
+}
+
+
 document.addEventListener('DOMContentLoaded', async () => {
     initCharts();
     caricaPreferenzeUtente();
-    applyGPSData(); // Carica subito la posizione salvata
+    applyGPSData();
+    await aggiornaPosizioneGPS(); 
     await fetchSensorData();
-    setInterval(fetchSensorData, 1000);
+    setInterval(fetchSensorData, getSavedInterval());
+    setInterval(aggiornaPosizioneGPS, 5000); // UNICO TIMER GPS PULITO
 });
 
-// 2. FUNZIONI DI UTILITÀ (Mettila qui!)
-async function ottieniIndirizzoTestuale(lat, lon) {
-    try {
-        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`, {
-            headers: { 'Accept-Language': 'it' }
-        });
-        const data = await response.json();
-        const addr = data.address;
-        const citta = addr.city || addr.town || addr.village || addr.municipality || "Località sconosciuta";
-        const via = addr.road || addr.suburb || "";
-        return via ? `${via}, ${citta}` : citta;
-    } catch (error) {
-        console.error("Errore geocoding:", error);
-        return "Indirizzo non disponibile";
-    }
-}
-
-// === GESTIONE BLOCCO POSIZIONE GPS (ESP32 via mDNS) ===
-const ESP_HOST = "http://meteo.local";  // oppure "http://192.168.x.x"
-const GPS_ENDPOINT = "http://meteo.local/api/data";
-
-let ultimaLat = 0;
-let ultimaLon = 0;
-let indirizzoSalvato = "";
-
-async function aggiornaPosizioneGPS() {
-    const localitaEl = document.getElementById("localitaNome");
-    const gpsCoordEl = document.getElementById("gpsCoordinate");
-    const gpsRawEl = document.getElementById("gpsRaw");
-
-    // Endpoint del tuo ESP32
-    const ESP_URL = "http://meteo.local/api/data"; 
-
-    try {
-        const response = await fetch(ESP_URL, { mode: 'cors', cache: 'no-store' });
-        const data = await response.json();
-
-        // CASO 1: GPS HA IL FIX (Coordinate valide)
-        if (data.lat && data.lat !== "0.0") {
-            const lat = parseFloat(data.lat);
-            const lon = parseFloat(data.lon);
-
-            // Otteniamo l'indirizzo solo se la posizione è cambiata (per non bloccare le API)
-            if (lat !== ultimaLat || lon !== ultimaLon) {
-                indirizzoSalvato = await ottieniIndirizzoTestuale(lat, lon);
-                ultimaLat = lat;
-                ultimaLon = lon;
-            }
-
-            // Aggiorniamo l'interfaccia
-            localitaEl.innerHTML = `<span style="color:#4ade80;font-weight:bold;">📍 ${indirizzoSalvato}</span>`;
-            gpsCoordEl.innerHTML = convertiInDMS(lat, lon);
-            if(gpsRawEl) gpsRawEl.textContent = `LAT: ${lat.toFixed(6)} | LON: ${lon.toFixed(6)}`;
-            
-            // Salvataggio per memoria locale
-            localStorage.setItem('ultimaPosizioneValida', JSON.stringify({
-                lat: lat, lon: lon, localita: indirizzoSalvato
-            }));
-        } 
-        // CASO 2: GPS IN RICERCA
-        else if (data.localita && (data.localita.includes("Ricerca") || data.localita.includes("attesa"))) {
-            localitaEl.innerHTML = `<span style="color:#facc15;font-weight:bold;"><i class="fas fa-sync fa-spin"></i> ${data.localita}</span>`;
-            
-            const salvata = localStorage.getItem('ultimaPosizioneValida');
-            if (salvata) {
-                const d = JSON.parse(salvata);
-                gpsCoordEl.innerHTML = `<small style="color:#94a3b8;">Ultimo fix noto:</small><br>${convertiInDMS(d.lat, d.lon)}`;
-            } else {
-                gpsCoordEl.innerHTML = "Acquisizione satelliti...<br><small>Porta l'antenna all'esterno</small>";
-            }
-        }
-    } catch (err) {
-        // CASO 3: ESP32 OFFLINE
-        console.warn("ESP32 non raggiungibile");
-        const salvata = localStorage.getItem('ultimaPosizioneValida');
-        if (salvata && !isManualLocation) {
-            const d = JSON.parse(salvata);
-            localitaEl.innerHTML = `<span style="color:#94a3b8;">📡 Offline (Ultima: ${d.localita})</span>`;
-            gpsCoordEl.innerHTML = convertiInDMS(d.lat, d.lon);
-        }
-    }
-}
-
-setInterval(aggiornaPosizioneGPS, 10000);
-document.addEventListener("DOMContentLoaded", aggiornaPosizioneGPS);
-
-
-// --- le righe successive del tuo file ---
 function closeModal() { q('chartModal').style.display = 'none'; }
 function toggleMenu() { q('sideMenu').classList.toggle('active'); }
-function avviaStampa(campo) { if (q('sideMenu')) q('sideMenu').classList.remove('active'); openModal(campo); } 
+function avviaStampa(campo) { if (q('sideMenu')) q('sideMenu').classList.remove('active'); openModal(campo); }
