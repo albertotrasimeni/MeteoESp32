@@ -25,7 +25,17 @@ const sensorCfg = {
     wind: { id: 'Wind', c: '#0ea5e9', u: 'km/h', targetId: 'windValue' }
 };
 
-// --- LOGICA GPS UNIFICATA (SENZA DOPPIONI) ---
+// --- LOGICA GPS ---
+
+function convertiInDMS(lat, lon) {
+    const toDMS = (v) => {
+        const d = Math.floor(Math.abs(v));
+        const m = Math.floor((Math.abs(v) - d) * 60);
+        const s = ((Math.abs(v) - d - (m / 60)) * 3600).toFixed(1);
+        return `${d}° ${m}′ ${s}″`;
+    };
+    return `${toDMS(lat)} ${lat >= 0 ? 'N' : 'S'}<br>${toDMS(lon)} ${lon >= 0 ? 'E' : 'W'}`;
+}
 
 function applyGPSData() {
     const manuale = localStorage.getItem('ultimaPosizione');
@@ -162,16 +172,6 @@ async function cercaIndirizzo() {
             applyGPSData(); toggleSearch(); input.value = "";
         } else { alert("Indirizzo non trovato."); }
     } catch (error) { console.error("Errore ricerca:", error); }
-}
-
-function convertiInDMS(lat, lon) {
-    const toDMS = (v) => {
-        const d = Math.floor(Math.abs(v));
-        const m = Math.floor((Math.abs(v) - d) * 60);
-        const s = ((Math.abs(v) - d - (m / 60)) * 3600).toFixed(1);
-        return `${d}° ${m}′ ${s}″`;
-    };
-    return `${toDMS(lat)} ${lat >= 0 ? 'N' : 'S'}<br>${toDMS(lon)} ${lon >= 0 ? 'E' : 'W'}`;
 }
 
 async function fetchSensorData() {
@@ -346,67 +346,62 @@ window.addEventListener('resize', () => {
     });
 });
 
-async function ottieniIndirizzoTestuale(lat, lon) {
-    try {
-        // ArcGIS è gratuito e molto preciso per i civici in Italia
-        const url = `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/reverseGeocode?f=pjson&location=${lon},${lat}`;
-        const response = await fetch(url);
-        const data = await response.json();
-        
-        if (data && data.address) {
-            // Address contiene "Via Amedeo di Savoia 79", City contiene "Cannara"
-            const via = data.address.Address || ""; 
-            const comune = data.address.City || "";  
-            
-            return via ? `${via}, ${comune}` : comune;
-        }
-        return "Indirizzo non disponibile";
-    } catch (e) { 
-        return "Indirizzo non disponibile"; 
-    }
-}
-
-// AGGIUNGO LA FUNZIONE MANCANTE CHE RICHIAMI IN FONDO
 async function aggiornaPosizioneGPS() {
-    const localitaEl = q("localitaNome");
-    const gpsCoordEl = q("gpsCoordinate");
-    const gpsRawEl = q("gpsRaw");
+    const urlGPS = "https://api.thingspeak.com/channels/3236443/feeds/last.json?api_key=PFSWSJSXRCV4C3I3";
+    
     try {
-        const response = await fetch("http://meteo.local/api/data", { mode: 'cors', cache: 'no-store' });
+        const response = await fetch(urlGPS);
         const data = await response.json();
         
-        if (!data.lat || parseFloat(data.lat) === 0) {
-            applyGPSData();
-            return;
-        }
+        if (data.field1 && data.field2) {
+            const lat = parseFloat(data.field1);
+            const lon = parseFloat(data.field2);
 
-        const lat = parseFloat(data.lat); 
-        const lon = parseFloat(data.lon);
+            // CONTROLLO FIX: Se le coordinate sono 0, ferma tutto qui
+            if (lat === 0 && lon === 0) {
+                if (q('localitaNome')) q('localitaNome').innerHTML = "ATTESA SEGNALE GPS...";
+                if (q('gpsCoordinate')) q('gpsCoordinate').innerHTML = "RICERCA SATELLITI...";
+                if (q('gpsRaw')) q('gpsRaw').innerHTML = "NO FIX";
+                return; 
+            }
 
-        if (lat.toFixed(4) !== ultimaLat.toFixed(4) || lon.toFixed(4) !== ultimaLon.toFixed(4)) {
-            let indirizzo = await ottieniIndirizzoTestuale(lat, lon);
-            if (localitaEl) localitaEl.innerHTML = `<span style="color:#4ade80;font-weight:bold;">📍 ${indirizzo}</span>`;
-            if (gpsRawEl) gpsRawEl.innerText = `LAT: ${lat.toFixed(5)} | LON: ${lon.toFixed(5)}`;
-            if (gpsCoordEl) gpsCoordEl.innerHTML = convertiInDMS(lat, lon);
+            // SE IL FIX C'È, RECUPERA L'INDIRIZZO
+            const urlReverse = `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/reverseGeocode?f=pjson&location=${lon},${lat}`;
+            const resAddr = await fetch(urlReverse);
+            const dataAddr = await resAddr.json();
             
-            localStorage.setItem('ultimaPosizioneValida', JSON.stringify({ lat, lon, localita: indirizzo }));
-            ultimaLat = lat; 
-            ultimaLon = lon;
+            if (dataAddr && dataAddr.address) {
+                // INDIRIZZO AL CENTRO (Grande e azzurro)
+                const indirizzo = dataAddr.address.Match_addr;
+                if (q('localitaNome')) q('localitaNome').innerHTML = indirizzo.toUpperCase();
+            }
+
+            // COORDINATE DMS SUBITO SOTTO
+            if (q('gpsCoordinate')) {
+                q('gpsCoordinate').innerHTML = convertiInDMS(lat, lon);
+            }
+
+            // COORDINATE RAW IN FONDO
+            if (q('gpsRaw')) {
+                q('gpsRaw').innerHTML = `LAT: ${lat.toFixed(6)} | LON: ${lon.toFixed(6)}`;
+            }
+
+            // Salva la posizione buona in memoria
+            localStorage.setItem('ultimaPosizioneValida', JSON.stringify({lat, lon}));
         }
-    } catch (err) {
-        applyGPSData();
+    } catch (err) { 
+        console.log("Errore aggiornamento GPS"); 
     }
 }
-
 
 document.addEventListener('DOMContentLoaded', async () => {
     initCharts();
     caricaPreferenzeUtente();
-    applyGPSData();
-    await aggiornaPosizioneGPS(); 
+    applyGPSData(); 
     await fetchSensorData();
+    await aggiornaPosizioneGPS(); 
     setInterval(fetchSensorData, getSavedInterval());
-    setInterval(aggiornaPosizioneGPS, 5000); // UNICO TIMER GPS PULITO
+    setInterval(aggiornaPosizioneGPS, 20000); // Aggiorna GPS ogni 20 secondi
 });
 
 function closeModal() { q('chartModal').style.display = 'none'; }
