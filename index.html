@@ -162,33 +162,24 @@
                     <div class="gps-search-container">
                         <input type="text" id="addressInput" placeholder="Cerca..."
                             onkeydown="if(event.key==='Enter') cercaIndirizzo()">
+                        <input type="text" id="addressInput" placeholder="Cerca...">
+                        <!---<button onclick="console.log('Click rilevato!'); cercaIndirizzo();">VAI</button> --->
                         <i class="fas fa-magnifying-glass search-trigger" onclick="toggleSearch()"
                             title="Cerca indirizzo"></i>
                     </div>
                 </div>
-
-                <div class="value-large" id="localitaNome">Avvio Gps....</div>
-
-                <div class="value" id="gpsCoordinate">
-                    --° --' --" N<br>--° --' --" E
+                <div class="gps-container"
+                    style="text-align:center; flex:1; display:flex; flex-direction:column; justify-content:center; padding:10px;">
+                    <div id="localitaNome"
+                        style="color:#38bdf8; font-size:1.4rem; font-weight:bold; margin-bottom:5px;">Cannara (PG)</div>
+                    <div id="gpsCoordinate"
+                        style="font-size:0.85rem; color:#f8fafc; margin-bottom:4px; line-height:1.2;">--° --′ --″
+                        N<br>--° --′ --″ E</div>
+                    <div id="gpsRaw" style="font-size:0.75rem; color:#94a3b8; opacity:0.7; margin-top:5px;">LAT: -- |
+                        LON: --</div>
                 </div>
-
-                <div id="gpsRaw" style="font-size: 0.75rem; color: #94a3b8; text-align: center; margin-top: 5px;">
-                    LAT: -- | LON: --
-                </div>
-            </div>
-            <div class="gps-container"
-                style="text-align:center; flex:1; display:flex; flex-direction:column; justify-content:center; padding:10px;">
-                <div id="localitaNome" style="color:#38bdf8; font-size:1.4rem; font-weight:bold; margin-bottom:5px;">
-                    "Inizializzazione...</div>
-                <div id="gpsCoordinate" style="font-size:0.85rem; color:#f8fafc; margin-bottom:4px; line-height:1.2;">
-                    --° --′ --″
-                    N<br>--° --′ --″ E</div>
-                <div id="gpsRaw" style="font-size:0.75rem; color:#94a3b8; opacity:0.7; margin-top:5px;">LAT: -- |
-                    LON: --</div>
             </div>
         </div>
-    </div>
     </div>
 
     <div id="chartModal" class="modal" style="display:none;">
