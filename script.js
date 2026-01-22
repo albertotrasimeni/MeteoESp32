@@ -393,6 +393,28 @@ async function aggiornaPosizioneGPS() {
         console.log("Errore aggiornamento GPS"); 
     }
 }
+function aggiornaOrologio() {
+    const oraAttuale = new Date();
+    
+    // Prende ore, minuti e secondi
+    const ore = String(oraAttuale.getHours()).padStart(2, '0');
+    const minuti = String(oraAttuale.getMinutes()).padStart(2, '0');
+    const secondi = String(oraAttuale.getSeconds()).padStart(2, '0');
+    
+    // Cerca l'elemento con ID 'clock' o 'orologio'
+    // Se nel tuo HTML l'id è diverso, cambialo qui sotto
+    const displayOrologio = document.getElementById('orologio') || document.getElementById('clock');
+    
+    if (displayOrologio) {
+        displayOrologio.innerHTML = `${ore}:${minuti}:${secondi}`;
+    }
+}
+
+// Avvia l'orologio ogni secondo
+setInterval(aggiornaOrologio, 1000);
+
+// Eseguila subito all'avvio
+aggiornaOrologio();
 
 document.addEventListener('DOMContentLoaded', async () => {
     initCharts();
