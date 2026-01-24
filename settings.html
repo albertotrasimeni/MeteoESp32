@@ -7,6 +7,14 @@
     <title>Impostazioni Dashboard Meteo</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <script type="text/javascript">
+        (function() {
+            emailjs.init("AUWMdckpzhhK65ID1");
+        })();
+    </script>
+
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -206,6 +214,20 @@
             sensors.forEach(s => {
                 const checkbox = document.getElementById('check_' + s);
                 if (checkbox) {
+                    // --- AGGIUNTA: LOGICA ALLARME ---
+                    const vecchioStato = localStorage.getItem('show_' + s) !== 'false';
+                    const nuovoStato = checkbox.checked;
+
+                    // Se spegni il sensore, invia l'allarme
+                    if (vecchioStato === true && nuovoStato === false) {
+                        emailjs.send("service_pl46jzr", "template_a8qo17e", {
+                            sensor_name: labels[s],
+                            name: "Alberto",
+                            time: new Date().toLocaleString()
+                        });
+                    }
+                    // --- FINE AGGIUNTA ---
+
                     const stato = checkbox.checked ? 'true' : 'false';
                     localStorage.setItem('show_' + s, stato);
                 }
