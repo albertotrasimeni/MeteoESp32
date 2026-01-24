@@ -418,3 +418,68 @@ body {
     position: relative !important;
     overflow: visible !important;
 }
+
+/* Centratura del corpo della card GPS */
+#block-gps .gps-container-fixed {
+    display: flex;          /* Attiva il layout flessibile */
+    flex-direction: column; /* Dispone gli elementi dall'alto in basso */
+    align-items: center;    /* Centra orizzontalmente tutti i blocchi figli */
+    text-align: center;     /* Centra il testo all'interno di ogni riga */
+    width: 100%;            /* Occupa tutta la larghezza disponibile */
+    margin-top: 15px;       /* Crea spazio tra il titolo e l'indirizzo */
+}
+
+/* Allineamento specifico per la riga delle coordinate e altitudine */
+
+/* SPINTA MASSIMA VERSO IL BASSO */
+#gpsRaw {
+    display: flex !important;
+    justify-content: center !important;
+    width: 100% !important;
+    
+    /* Aumentato a 55px per portarlo quasi sul bordo inferiore */
+    margin-top: 55px !important; 
+    
+    /* Lo rendiamo un po' più piccolo per farlo sembrare una riga di stato */
+    font-size: 0.8rem !important;
+    color: rgba(255, 255, 255, 0.6) !important;
+    letter-spacing: 0.5px;
+}
+
+/* Colore verde per l'altitudine */
+#gpsRaw b, #gpsRaw span {
+    color: #2ecc71 !important;
+}
+
+/* 1. LA CARD (Sola e unica) */
+#block-gps {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+    padding-top: 15px !important;
+    height: 100% !important;
+}
+
+/* 2. IL CORPO CENTRALE (Sola e unica) */
+#block-gps .gps-container-fixed {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center !important;
+}
+
+/* 3. LA RIGA VERDE (Quella che abbiamo spinto giù) */
+#gpsRaw {
+    display: flex !important;
+    justify-content: center !important;
+    width: 100% !important;
+    margin-top: 55px !important; /* La spinta verso il basso */
+    font-size: 0.8rem !important;
+    color: rgba(255, 255, 255, 0.6) !important;
+    letter-spacing: 0.5px;
+}
+
+/* 4. IL COLORE DELL'ALTITUDINE */
+#gpsRaw b, #gpsRaw span {
+    color: #2ecc71 !important;
+}

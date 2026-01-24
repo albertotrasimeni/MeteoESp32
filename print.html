@@ -4,32 +4,74 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Report Tecnico - Stazione Meteo ESP32</title>
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
     <style>
         :root { --accent: #0ea5e9; --border: #e2e8f0; }
         body { font-family: 'Segoe UI', sans-serif; padding: 40px; color: #1e293b; background: white; margin: 0; }
-        header { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid var(--accent); padding-bottom: 15px; margin-bottom: 30px; }
+        
+        header { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid var(--accent); padding-bottom: 15px; margin-bottom: 30px; position: relative; }
+        
+        /* Ottimizzazione Grid per Mobile: da 4 colonne a 2 o 1 su schermi piccoli */
         .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px; }
-        @media (max-width: 768px) { .summary-grid { grid-template-columns: repeat(2, 1fr); } }
+        
+        @media (max-width: 768px) {
+            body { padding: 15px; }
+            header { flex-direction: column; text-align: center; gap: 10px; }
+            .summary-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        @media (max-width: 480px) {
+            .summary-grid { grid-template-columns: 1fr; }
+        }
+
         .summary-item { border: 1px solid var(--border); padding: 15px; border-radius: 8px; text-align: center; }
+        
         .report-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
-        .chart-card { border: 1px solid var(--border); padding: 15px; height: 320px; border-radius: 8px; page-break-inside: avoid; background: #fff; display: flex; flex-direction: column; }
-        .chart-wrapper { flex: 1; position: relative; }
-        .table-container { width: 100%; overflow-x: auto; margin-top: 30px; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        .chart-card { border: 1px solid var(--border); padding: 15px; height: 320px; border-radius: 8px; page-break-inside: avoid; background: #fff; display:flex; flex-direction:column; }
+        .chart-card h4 { margin: 0 0 8px 0; font-size: 1rem; }
+        .chart-wrapper { flex:1; position: relative; }
+
+        /* Ottimizzazione Tabella per Mobile (Scroll orizzontale se necessario) */
+        .table-container { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 30px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.8rem; min-width: 600px; }
         th, td { border: 1px solid var(--border); padding: 8px; text-align: center; }
         th { background-color: #f8fafc; color: var(--accent); }
-        .no-print { display: block; text-align: right; margin-bottom: 20px; }
-        .close-window { position: fixed; top: 12px; right: 12px; z-index: 9999; background: #fff; border: 1px solid var(--border); padding: 8px; border-radius: 6px; cursor: pointer; color: var(--accent); }
-        @media print { .no-print, .close-window { display: none !important; } }
+
+        .close-window {
+            position: fixed;
+            top: 12px;
+            right: 12px;
+            z-index: 9999;
+            background: #fff;
+            border: 1px solid var(--border);
+            font-size: 20px;
+            cursor: pointer;
+            color: var(--accent);
+            padding: 8px;
+            border-radius: 6px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        @media print { 
+            .no-print { display: none !important; } 
+            body { padding: 10mm; } 
+            .chart-card { height: 280px; } 
+            .close-window { display: none !important; }
+            .table-container { overflow: visible; }
+            table { min-width: auto; }
+        }
     </style>
 </head>
 <body>
 
-    <button class="close-window" onclick="window.close()"><i class="fas fa-times"></i></button>
+    <button class="no-print close-window" title="Chiudi" onclick="window.close()">
+        <i class="fas fa-times"></i>
+    </button>
 
-    <div class="no-print">
+    <div class="no-print" style="text-align:right; margin-bottom: 20px;">
         <button onclick="window.print()" style="padding: 12px 20px; cursor:pointer; background: var(--accent); color:white; border:none; border-radius:5px; font-weight: bold;">
             <i class="fas fa-print"></i> STAMPA / SALVA PDF
         </button>
@@ -40,99 +82,147 @@
             <h1 style="margin:0; color: var(--accent); font-size: 1.5rem;">REPORT METEO ESP32</h1>
             <p id="genDate" style="color:#64748b; margin-top:5px; font-size: 0.9rem;"></p>
         </div>
-        <div style="font-size: 0.9rem;"><strong>Sistema:</strong> ESP32-WROOM<br><strong>FW:</strong> 2.3-ASYNC-PRO</div>
+        <div style="font-size: 0.9rem;">
+            <strong>Sistema:</strong> ESP32-WROOM<br>
+            <strong>FW:</strong> 2.3-ASYNC-PRO
+        </div>
     </header>
 
     <div class="summary-grid" id="summaryBox"></div>
+    
     <div class="report-grid" id="chartsGrid"></div>
 
     <div class="table-container">
         <table>
-            <thead><tr id="tableHeader"></tr></thead>
+            <thead>
+                <tr>
+                    <th>Ora</th>
+                    <th>Temp (°C)</th>
+                    <th>Hum (%)</th>
+                    <th>Press (hPa)</th>
+                    <th>IAQ</th>
+                    <th>CO2 (ppm)</th>
+                    <th>PM2.5</th>
+                    <th>UV</th>
+                    <th>Vento (km/h)</th>
+                </tr>
+            </thead>
             <tbody id="tableBody"></tbody>
         </table>
     </div>
 
     <script>
-        // 1. RECUPERO DATI E CONFIGURAZIONE
-        const urlParams = new URLSearchParams(window.location.search);
-        const dataFromURL = urlParams.get('data');
-        let data = dataFromURL ? JSON.parse(decodeURIComponent(dataFromURL)) : JSON.parse(localStorage.getItem("printData") || 'null');
+        const data = JSON.parse(localStorage.getItem("printData") || 'null');
 
         const sets = [
-            { k: 'temp', n: 'Temperatura', u: '°C', c: '#ef4444' },
-            { k: 'hum', n: 'Umidità', u: '%', c: '#3b82f6' },
-            { k: 'press_mb', n: 'Pressione', u: 'hPa', c: '#f59e0b' },
-            { k: 'iaq', n: 'IAQ', u: '', c: '#10b981' },
-            { k: 'co2', n: 'CO2', u: 'ppm', c: '#a855f7' },
-            { k: 'pm25', n: 'PM2.5', u: 'µg/m³', c: '#64748b' },
-            { k: 'uv', n: 'UV', u: 'Idx', c: '#fbbf24' },
-            { k: 'wind', n: 'Vento', u: 'km/h', c: '#0ea5e9' }
+            {k:'temp', n:'Temperatura', c:'#ef4444'},
+            {k:'hum', n:'Umidità', c:'#3b82f6'},
+            {k:'press_mb', n:'Pressione', c:'#f59e0b'},
+            {k:'iaq', n:'Qualità Aria', c:'#10b981'},
+            {k:'co2', n:'CO2', c:'#a855f7'},
+            {k:'pm25', n:'PM2.5', c:'#64748b'},
+            {k:'uv', n:'Indice UV', c:'#fbbf24'},
+            {k:'wind', n:'Vento', c:'#0ea5e9'}
         ];
 
         function safeVal(arr, i) { return (Array.isArray(arr) && arr[i] !== undefined) ? arr[i] : ''; }
 
         if (data && Array.isArray(data.labels)) {
-            const vis = data.visibilita || {};
-            document.getElementById('genDate').textContent = "Generato il: " + new Date().toLocaleString();
+            document.getElementById('genDate').textContent = "Documento generato il: " + new Date().toLocaleString();
 
-            // --- A. COSTRUZIONE TABELLA (FILTRATA) ---
-            const tHead = document.getElementById('tableHeader');
-            const tBody = document.getElementById('tableBody');
-            let headerHTML = '<th>Ora</th>';
-            sets.forEach(s => { if (vis[s.k] !== false) headerHTML += `<th>${s.n} ${s.u}</th>`; });
-            tHead.innerHTML = headerHTML;
+            const tbody = document.getElementById('tableBody');
+            const chartsGrid = document.getElementById('chartsGrid');
+            const summaryBox = document.getElementById('summaryBox');
 
             data.labels.forEach((label, i) => {
-                let row = `<td>${label}</td>`;
-                sets.forEach(s => { if (vis[s.k] !== false) row += `<td>${safeVal(data[s.k], i)}</td>`; });
-                tBody.innerHTML += `<tr>${row}</tr>`;
+                const row = `<tr>
+                    <td>${label || ''}</td>
+                    <td>${safeVal(data.temp, i)}</td>
+                    <td>${safeVal(data.hum, i)}</td>
+                    <td>${safeVal(data.press_mb, i)}</td>
+                    <td>${safeVal(data.iaq, i)}</td>
+                    <td>${safeVal(data.co2, i)}</td>
+                    <td>${safeVal(data.pm25, i)}</td>
+                    <td>${safeVal(data.uv, i)}</td>
+                    <td>${safeVal(data.wind, i)}</td>
+                </tr>`;
+                tbody.innerHTML += row;
             });
 
-            // --- B. GESTIONE SUMMARY E GRAFICI ---
-            const summaryBox = document.getElementById('summaryBox');
-            const chartsGrid = document.getElementById('chartsGrid');
-            const chartPromises = [];
-
-            sets.forEach((s, idx) => {
-                const isVisible = vis[s.k] !== false;
-                if (!isVisible) return; // Se non è visibile, salta tutto il blocco
-
-                // Crea Summary Item
+            sets.forEach(s => {
                 const arr = data[s.k] || [];
-                const last = arr.length ? arr[arr.length - 1] : '--';
-                summaryBox.innerHTML += `<div class="summary-item"><strong style="color:${s.c}">${s.n}</strong><div style="font-size:1.4rem;">${last} ${s.u}</div></div>`;
+                const last = arr.length ? arr[arr.length - 1] : '';
+                const item = document.createElement('div');
+                item.className = 'summary-item';
+                item.innerHTML = `<strong style="color:${s.c}">${s.n}</strong><div style="font-size:1.4rem; margin-top:8px;">${last}</div>`;
+                summaryBox.appendChild(item);
+            });
 
-                // Crea Chart Card e Grafico
-                const promise = new Promise(resolve => {
+            const chartPromises = sets.map((s, idx) => {
+                return new Promise(resolve => {
                     const card = document.createElement('div');
                     card.className = 'chart-card';
                     card.innerHTML = `<h4>Andamento ${s.n}</h4><div class="chart-wrapper"><canvas id="chart_${s.k}"></canvas></div>`;
                     chartsGrid.appendChild(card);
 
                     setTimeout(() => {
-                        const ctx = document.getElementById(`chart_${s.k}`).getContext('2d');
-                        new Chart(ctx, {
-                            type: 'line',
-                            data: {
-                                labels: data.labels,
-                                datasets: [{ label: s.n, data: arr, borderColor: s.c, backgroundColor: s.c + '15', fill: true, tension: 0.3 }]
-                            },
-                            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
-                        });
-                        resolve();
-                    }, idx * 100);
+                        const canvasEl = document.getElementById(`chart_${s.k}`);
+                        if (!canvasEl) { resolve(true); return; }
+                        const ctx = canvasEl.getContext('2d');
+                        try {
+                            new Chart(ctx, {
+                                type: 'line',
+                                data: {
+                                    labels: data.labels,
+                                    datasets: [{ label: s.n, data: (data[s.k] || []), borderColor: s.c, fill: true, backgroundColor: s.c + '10', tension: 0.3 }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: { legend: { display: false } },
+                                    scales: {
+                                        x: {
+                                            display: true,
+                                            ticks: {
+                                                color: '#64748b',
+                                                autoSkip: true,
+                                                maxRotation: 45,
+                                                minRotation: 0,
+                                                maxTicksLimit: 10,
+                                                font: { size: 10 }
+                                            },
+                                            grid: { display: false }
+                                        },
+                                        y: {
+                                            ticks: {
+                                                color: '#64748b',
+                                                font: { size: 10 }
+                                            },
+                                            grid: { color: 'rgba(0,0,0,0.05)' }
+                                        }
+                                    },
+                                    layout: { padding: { bottom: 6 } }
+                                }
+                            });
+                        } catch (err) {
+                            console.warn('Errore grafico', s.k, err);
+                        }
+                        resolve(true);
+                    }, idx * 80);
                 });
-                chartPromises.push(promise);
             });
 
-            // --- C. AVVIO STAMPA ---
             Promise.all(chartPromises).then(() => {
-                if (localStorage.getItem('autoPrint') === '1' || dataFromURL) {
+                if (localStorage.getItem('autoPrint') === '1') {
                     localStorage.removeItem('autoPrint');
-                    setTimeout(() => { window.print(); }, 1000);
+                    setTimeout(() => {
+                        window.print();
+                        try { localStorage.removeItem('printData'); } catch(e) {}
+                    }, 800);
                 }
             });
+        } else {
+            document.body.innerHTML = "<h1 style='text-align:center; margin-top:50px;'>Errore: Nessun dato trovato.<br><small>Torna alla dashboard e riprova.</small></h1>";
         }
     </script>
 </body>

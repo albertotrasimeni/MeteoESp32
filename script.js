@@ -8,7 +8,6 @@ let ricercaManualeSuggerita = false;
 let tempoInizioDashboard = Date.now();
 let ultimaLat = 0;
 let ultimaLon = 0;
-let sensoreSelezionatoPerStampa = null; // Memorizza il sensore scelto dal menu
 
 function getSavedInterval() {
     const saved = localStorage.getItem('updateInterval');
@@ -254,44 +253,63 @@ function openModal(sensor) {
 }
 
 function eseguiStampaEffettiva() {
-    // Controllo se i grafici sono pronti
-    if (!miniCharts.temp || miniCharts.temp.data.labels.length === 0) {
-        alert("Dati non pronti o sessione scaduta.");
-        return;
-    }
-
-    const campi = ['temp', 'hum', 'press_mb', 'iaq', 'co2', 'pm25', 'uv', 'wind'];
-    const visibilita = {};
-
-    // Logica di filtraggio: se hai cliccato un sensore specifico, spegne gli altri
-    campi.forEach(c => {
-        if (sensoreSelezionatoPerStampa) {
-            visibilita[c] = (c === sensoreSelezionatoPerStampa);
-        } else {
-            // Se non c'è selezione (stampa generale), usa le preferenze utente
-            visibilita[c] = localStorage.getItem('show_' + c) !== 'false';
+    if (!bigChart) return;
+    bigChart.options.scales.x.ticks.color = '#000000';
+    bigChart.options.scales.y.ticks.color = '#000000';
+    bigChart.options.plugins.legend.labels.color = '#000000';
+    bigChart.update('none');
+    setTimeout(() => {
+        const imgData = bigChart.toBase64Image();
+        let pImg = q('printImg') || document.createElement('img');
+        pImg.id = 'printImg'; pImg.src = imgData; pImg.style.display = 'block';
+        document.querySelector('#chartModal .modal-content').appendChild(pImg);
+        q('bigChartCanvas').style.visibility = 'hidden';
+        const salvataggio = JSON.parse(localStorage.getItem('ultimaPosizioneValida')) || { lat: 0, lon: 0 };
+        if (q('modalCoords')) {
+            q('modalCoords').innerText = `LAT: ${salvataggio.lat} | LON: ${salvataggio.lon}`;
+            q('modalCoords').style.color = 'black';
         }
-    });
+        window.print();
+        setTimeout(() => {
+            pImg.style.display = 'none'; q('bigChartCanvas').style.visibility = 'visible';
+            bigChart.options.scales.x.ticks.color = '#ffffff'; bigChart.options.scales.y.ticks.color = '#ffffff';
+            bigChart.options.plugins.legend.labels.color = '#ffffff'; bigChart.update('none');
+            if (q('modalCoords')) q('modalCoords').style.color = 'white';
+        }, 500);
+    }, 250);
+}
 
-    // Preparazione del pacchetto dati per print.html
-    const pacchettoDati = {
-        labels: Array.from(miniCharts.temp.data.labels),
-        temp: Array.from(miniCharts.temp.data.datasets[0].data),
-        hum: Array.from(miniCharts.hum.data.datasets[0].data),
-        press_mb: Array.from(miniCharts.press_mb.data.datasets[0].data),
-        iaq: Array.from(miniCharts.iaq.data.datasets[0].data),
-        co2: Array.from(miniCharts.co2.data.datasets[0].data),
-        pm25: Array.from(miniCharts.pm25.data.datasets[0].data),
-        uv: Array.from(miniCharts.uv.data.datasets[0].data),
-        wind: Array.from(miniCharts.wind.data.datasets[0].data),
-        visibilita: visibilita 
-    };
-
-    // Reset dopo la stampa per non influenzare stampe future
-    sensoreSelezionatoPerStampa = null;
-
-    const encodedData = encodeURIComponent(JSON.stringify(pacchettoDati));
-    window.open('print.html?data=' + encodedData, '_blank');
+async function esportaCSV() {
+    try {
+        const intervalloMs = getSavedInterval();
+        let risultati = 500; let timescale = "";
+        if (intervalloMs <= 15000) risultati = 480;
+        else if (intervalloMs <= 60000) { risultati = 720; timescale = "&timescale=1"; }
+        else { risultati = 540; timescale = "&timescale=240"; }
+        const url = `https://api.thingspeak.com/channels/3221413/feeds.json?results=${risultati}${timescale}`;
+        const res = await fetch(url);
+        const feeds = (await res.json()).feeds;
+        if (!feeds || feeds.length === 0) { alert("Nessun dato trovato."); return; }
+        let csv = "GIORNO;MESE;ANNO;ORA;" + Object.keys(sensorCfg).map(k => sensorCfg[k].id.toUpperCase()).join(";") + "\n";
+        let ultimoT = 0;
+        feeds.forEach(f => {
+            const d = new Date(f.created_at);
+            const t = d.getTime();
+            if (t - ultimoT < (intervalloMs - 2000)) return;
+            ultimoT = t;
+            const riga = [
+                String(d.getDate()).padStart(2, '0'), String(d.getMonth() + 1).padStart(2, '0'), d.getFullYear(),
+                d.getHours().toString().padStart(2, '0') + ":" + d.getMinutes().toString().padStart(2, '0') + ":" + d.getSeconds().toString().padStart(2, '0'),
+                f.field1, f.field2, f.field3, f.field4, f.field5, f.field6, f.field7, f.field8
+            ].map(v => v?.toString().replace('.', ',')).join(";");
+            csv += riga + "\n";
+        });
+        const blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.setAttribute("download", `Report_Meteo.csv`);
+        link.click();
+    } catch (e) { alert("Errore download."); }
 }
 
 function initCharts() {
@@ -338,6 +356,8 @@ async function aggiornaPosizioneGPS() {
         if (data.field1 && data.field2) {
             const lat = parseFloat(data.field1);
             const lon = parseFloat(data.field2);
+            // RECUPERO ALTITUDINE dal field3 (novità)
+            const alt = data.field3 ? parseFloat(data.field3).toFixed(1) : "--";
 
             // CONTROLLO FIX: Se le coordinate sono 0, ferma tutto qui
             if (lat === 0 && lon === 0) {
@@ -353,28 +373,27 @@ async function aggiornaPosizioneGPS() {
             const dataAddr = await resAddr.json();
             
             if (dataAddr && dataAddr.address) {
-                // INDIRIZZO AL CENTRO (Grande e azzurro)
                 const indirizzo = dataAddr.address.Match_addr;
                 if (q('localitaNome')) q('localitaNome').innerHTML = indirizzo.toUpperCase();
             }
 
-            // COORDINATE DMS SUBITO SOTTO
             if (q('gpsCoordinate')) {
                 q('gpsCoordinate').innerHTML = convertiInDMS(lat, lon);
             }
 
-            // COORDINATE RAW IN FONDO
+            // COORDINATE RAW IN FONDO + ALTITUDINE (Integrata qui per non sformattare)
             if (q('gpsRaw')) {
-                q('gpsRaw').innerHTML = `LAT: ${lat.toFixed(6)} | LON: ${lon.toFixed(6)}`;
+                q('gpsRaw').innerHTML = `LAT: ${lat.toFixed(6)} | LON: ${lon.toFixed(6)} | ALT: <span style="color: #00ff88;">${alt} m</span>`;
             }
 
-            // Salva la posizione buona in memoria
-            localStorage.setItem('ultimaPosizioneValida', JSON.stringify({lat, lon}));
+            // Salva la posizione buona in memoria (inclusa altitudine se vuoi)
+            localStorage.setItem('ultimaPosizioneValida', JSON.stringify({lat, lon, alt}));
         }
     } catch (err) { 
         console.log("Errore aggiornamento GPS"); 
     }
 }
+
 function aggiornaOrologio() {
     const oraAttuale = new Date();
     
@@ -410,8 +429,4 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 function closeModal() { q('chartModal').style.display = 'none'; }
 function toggleMenu() { q('sideMenu').classList.toggle('active'); }
-function avviaStampa(campo) { 
-    if (q('sideMenu')) q('sideMenu').classList.remove('active'); 
-    sensoreSelezionatoPerStampa = campo; // Salva il sensore (es. 'temp')
-    openModal(campo); 
-}
+function avviaStampa(campo) { if (q('sideMenu')) q('sideMenu').classList.remove('active'); openModal(campo); }
