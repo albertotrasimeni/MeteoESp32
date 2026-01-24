@@ -19,7 +19,7 @@
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             padding: 15px;
-            background: #0f172a; /* Allineato al tema scuro della dashboard */
+            background: #0f172a;
             color: white;
             margin: 0;
         }
@@ -38,7 +38,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 14px 0; /* Leggermente più alto per il touch */
+            padding: 14px 0;
             border-bottom: 1px solid #334155;
         }
 
@@ -126,7 +126,6 @@
             padding: 10px;
         }
 
-        /* Ottimizzazione Select per Mobile */
         select {
             padding: 8px;
             border-radius: 8px;
@@ -167,8 +166,7 @@
 
         <hr>
         <h3>Visibilità Sensori</h3>
-        <div id="switches-container">
-            </div>
+        <div id="switches-container"></div>
 
         <button type="button" class="btn-save" onclick="saveSettings()">SALVA IMPOSTAZIONI</button>
 
@@ -214,19 +212,23 @@
             sensors.forEach(s => {
                 const checkbox = document.getElementById('check_' + s);
                 if (checkbox) {
-                    // --- AGGIUNTA: LOGICA ALLARME ---
                     const vecchioStato = localStorage.getItem('show_' + s) !== 'false';
                     const nuovoStato = checkbox.checked;
 
-                    // Se spegni il sensore, invia l'allarme
+                    // INVIO ALLARME SE IL SENSORE VIENE SPENTO
                     if (vecchioStato === true && nuovoStato === false) {
+                        
+                        // Prepariamo i dati reali da spedire
+                        const oraAttuale = new Date().toLocaleString('it-IT');
+                        const coordGPS = "LAT: 42.992092 | LON: 12.582723"; // Coordinate Tabaccheria Diouf
+
                         emailjs.send("service_pl46jzr", "template_a8qo17e", {
                             sensor_name: labels[s],
                             name: "Alberto",
-                            time: new Date().toLocaleString()
+                            time: oraAttuale,
+                            gps_data: coordGPS
                         });
                     }
-                    // --- FINE AGGIUNTA ---
 
                     const stato = checkbox.checked ? 'true' : 'false';
                     localStorage.setItem('show_' + s, stato);
