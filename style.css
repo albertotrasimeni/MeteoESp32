@@ -403,17 +403,35 @@ body {
 }
 
 /* Fix per il testo della località (Azzurro e Grassetto) */
+/* Fix per il testo della località (Ridotto per evitare espansione card) */
+/* Fix per il testo della località (Corretto con selettore e parentesi) */
+
+/* Fix definitivo per il testo della località */
+/* ELIMINA LE VECCHIE VERSIONI E INCOLLA QUESTA */
+/* FORZATURA TAGLIO INDIRIZZO */
+/* Testo località leggermente più grande e leggibile */
 #localitaNome {
-    color: #38bdf8;
-    font-size: 1.2rem;
-    font-weight: bold;
-    margin-top: 10px;
-    display: block;
-    word-wrap: break-word;
-    line-height: 1.2;
+    color: #38bdf8 !important;
+    font-size: 1.05rem !important; /* Aumentato da 0.85rem a 1.05rem */
+    font-weight: bold !important;
+    text-align: center !important;
+    margin-top: 5px !important;
+    line-height: 1.2 !important;
+    word-wrap: break-word !important;
+    
+    /* Manteniamo il blocco per la sicurezza del layout */
+    display: block !important;
+    max-height: 2.5em !important; 
+    overflow: hidden !important;
 }
 
-/* Evita che il titolo della card copra la barra di ricerca */
+/* Regoliamo lo spazio inferiore per non far uscire i dati */
+#gpsRaw {
+    display: flex !important;
+    justify-content: center !important;
+    margin-top: 15px !important; /* Spazio ridotto per accogliere il testo più grande sopra */
+    font-size: 0.8rem !important;
+}
 #block-gps .card-header {
     position: relative !important;
     overflow: visible !important;

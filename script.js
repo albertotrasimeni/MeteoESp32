@@ -3,8 +3,8 @@ let miniCharts = {};
 let bigChart = null;
 let lastChartUpdate = 0;
 let isManualLocation = false;
-let tempoInizioRicercaAntenna = null; 
-let ricercaManualeSuggerita = false;  
+let tempoInizioRicercaAntenna = null;
+let ricercaManualeSuggerita = false;
 let tempoInizioDashboard = Date.now();
 let ultimaLat = 0;
 let ultimaLon = 0;
@@ -226,57 +226,86 @@ function updateMiniChart(key, val) {
 }
 
 function openModal(sensor) {
+    // 1. Apri il modale
     q('chartModal').style.display = 'flex';
+    
     const cfg = sensorCfg[sensor];
+    // Se i dati non esistono, esci e non fare danni
     if (!cfg || !miniCharts[sensor]) return;
+
     q('modalTitle').innerText = "Storico: " + cfg.id;
     const ctx = q('bigChartCanvas').getContext('2d');
-    if (bigChart) bigChart.destroy();
+
+    // 2. Distruggi il vecchio grafico se esiste (evita sovrapposizioni)
+    if (bigChart) { bigChart.destroy(); bigChart = null; }
+
+    // 3. CREAZIONE GRAFICO (Correzione Assi e Spazi)
     bigChart = new Chart(ctx, {
         type: 'line',
         data: {
             labels: miniCharts[sensor].data.labels,
             datasets: [{
-                label: cfg.id, data: miniCharts[sensor].data.datasets[0].data,
-                borderColor: cfg.c, backgroundColor: cfg.c + '33', fill: true, tension: 0.3, pointRadius: 2
+                label: cfg.id,
+                data: miniCharts[sensor].data.datasets[0].data,
+                borderColor: cfg.c,
+                backgroundColor: cfg.c + '33',
+                fill: true,
+                tension: 0.3
             }]
         },
         options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { labels: { color: '#ffffff' } } },
+            responsive: true,
+            maintainAspectRatio: false,
+            layout: { padding: { left: 55, right: 25, top: 10, bottom: 40 } },
             scales: {
-                x: { ticks: { color: '#ffffff' }, grid: { color: 'rgba(148,163,184,0.35)' } },
-                y: { ticks: { color: '#ffffff' }, grid: { color: 'rgba(148,163,184,0.35)' } }
-            }
+                x: { ticks: { color: '#ffffff' }, grid: { color: 'rgba(255,255,255,0.1)' } },
+                y: { ticks: { color: '#ffffff' }, grid: { color: 'rgba(255,255,255,0.1)' } }
+            },
+            plugins: { legend: { labels: { color: '#ffffff' } } }
         }
+    });
+
+    // 4. GESTIONE TABELLA (Correzione 2 Colonne)
+    const thead = q('modalTableHead'); 
+    const tbody = q('modalTableBody');
+
+    // Forza l'intestazione a sole 2 colonne: Ora e Nome Sensore
+    thead.innerHTML = `<tr><th style="color:#38bdf8">Ora</th><th style="color:#38bdf8">${cfg.id}</th></tr>`;
+    
+    // Pulisce tutto il corpo della tabella
+    tbody.innerHTML = ""; 
+
+    const orari = miniCharts[sensor].data.labels;
+    const valori = miniCharts[sensor].data.datasets[0].data;
+
+    // Crea le righe: mette solo Ora e Valore
+    orari.forEach((ora, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `<td>${ora}</td><td style="font-weight:bold">${valori[index]}</td>`;
+        tbody.appendChild(row);
     });
 }
 
 function eseguiStampaEffettiva() {
-    if (!bigChart) return;
-    bigChart.options.scales.x.ticks.color = '#000000';
-    bigChart.options.scales.y.ticks.color = '#000000';
-    bigChart.options.plugins.legend.labels.color = '#000000';
-    bigChart.update('none');
-    setTimeout(() => {
-        const imgData = bigChart.toBase64Image();
-        let pImg = q('printImg') || document.createElement('img');
-        pImg.id = 'printImg'; pImg.src = imgData; pImg.style.display = 'block';
-        document.querySelector('#chartModal .modal-content').appendChild(pImg);
-        q('bigChartCanvas').style.visibility = 'hidden';
-        const salvataggio = JSON.parse(localStorage.getItem('ultimaPosizioneValida')) || { lat: 0, lon: 0 };
-        if (q('modalCoords')) {
-            q('modalCoords').innerText = `LAT: ${salvataggio.lat} | LON: ${salvataggio.lon}`;
-            q('modalCoords').style.color = 'black';
-        }
-        window.print();
-        setTimeout(() => {
-            pImg.style.display = 'none'; q('bigChartCanvas').style.visibility = 'visible';
-            bigChart.options.scales.x.ticks.color = '#ffffff'; bigChart.options.scales.y.ticks.color = '#ffffff';
-            bigChart.options.plugins.legend.labels.color = '#ffffff'; bigChart.update('none');
-            if (q('modalCoords')) q('modalCoords').style.color = 'white';
-        }, 500);
-    }, 250);
+    const elTitolo = q('modalTitle');
+    const elGps = q('gpsRaw');
+    
+    // Prendiamo solo il colore e i dati del sensore che stiamo visualizzando ora
+    const coloreCorrente = bigChart.data.datasets[0].borderColor;
+    const nomeSensore = elTitolo ? elTitolo.innerText.replace("Storico: ", "") : "Dato";
+
+    const reportData = {
+        n: elTitolo ? elTitolo.innerText : "Analisi Dati",
+        l: bigChart.data.labels, // Invia le ore
+        v: bigChart.data.datasets[0].data, // Invia SOLO i valori del sensore attivo
+        g: elGps ? elGps.innerText : "--",
+        c: coloreCorrente,
+        sensorName: nomeSensore // Specifichiamo il nome per la colonna singola
+    };
+
+    const json = JSON.stringify(reportData);
+    const encoded = btoa(unescape(encodeURIComponent(json)));
+    window.open('print.html?data=' + encoded, '_blank');
 }
 
 async function esportaCSV() {
@@ -348,11 +377,11 @@ window.addEventListener('resize', () => {
 
 async function aggiornaPosizioneGPS() {
     const urlGPS = "https://api.thingspeak.com/channels/3236443/feeds/last.json?api_key=PFSWSJSXRCV4C3I3";
-    
+
     try {
         const response = await fetch(urlGPS);
         const data = await response.json();
-        
+
         if (data.field1 && data.field2) {
             const lat = parseFloat(data.field1);
             const lon = parseFloat(data.field2);
@@ -364,14 +393,14 @@ async function aggiornaPosizioneGPS() {
                 if (q('localitaNome')) q('localitaNome').innerHTML = "ATTESA SEGNALE GPS...";
                 if (q('gpsCoordinate')) q('gpsCoordinate').innerHTML = "RICERCA SATELLITI...";
                 if (q('gpsRaw')) q('gpsRaw').innerHTML = "NO FIX";
-                return; 
+                return;
             }
 
             // SE IL FIX C'È, RECUPERA L'INDIRIZZO
             const urlReverse = `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/reverseGeocode?f=pjson&location=${lon},${lat}`;
             const resAddr = await fetch(urlReverse);
             const dataAddr = await resAddr.json();
-            
+
             if (dataAddr && dataAddr.address) {
                 const indirizzo = dataAddr.address.Match_addr;
                 if (q('localitaNome')) q('localitaNome').innerHTML = indirizzo.toUpperCase();
@@ -387,25 +416,25 @@ async function aggiornaPosizioneGPS() {
             }
 
             // Salva la posizione buona in memoria (inclusa altitudine se vuoi)
-            localStorage.setItem('ultimaPosizioneValida', JSON.stringify({lat, lon, alt}));
+            localStorage.setItem('ultimaPosizioneValida', JSON.stringify({ lat, lon, alt }));
         }
-    } catch (err) { 
-        console.log("Errore aggiornamento GPS"); 
+    } catch (err) {
+        console.log("Errore aggiornamento GPS");
     }
 }
 
 function aggiornaOrologio() {
     const oraAttuale = new Date();
-    
+
     // Prende ore, minuti e secondi
     const ore = String(oraAttuale.getHours()).padStart(2, '0');
     const minuti = String(oraAttuale.getMinutes()).padStart(2, '0');
     const secondi = String(oraAttuale.getSeconds()).padStart(2, '0');
-    
+
     // Cerca l'elemento con ID 'clock' o 'orologio'
     // Se nel tuo HTML l'id è diverso, cambialo qui sotto
     const displayOrologio = document.getElementById('orologio') || document.getElementById('clock');
-    
+
     if (displayOrologio) {
         displayOrologio.innerHTML = `${ore}:${minuti}:${secondi}`;
     }
@@ -420,9 +449,9 @@ aggiornaOrologio();
 document.addEventListener('DOMContentLoaded', async () => {
     initCharts();
     caricaPreferenzeUtente();
-    applyGPSData(); 
+    applyGPSData();
     await fetchSensorData();
-    await aggiornaPosizioneGPS(); 
+    await aggiornaPosizioneGPS();
     setInterval(fetchSensorData, getSavedInterval());
     setInterval(aggiornaPosizioneGPS, 20000); // Aggiorna GPS ogni 20 secondi
 });
