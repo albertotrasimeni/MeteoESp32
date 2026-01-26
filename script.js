@@ -3,8 +3,8 @@ let miniCharts = {};
 let bigChart = null;
 let lastChartUpdate = 0;
 let isManualLocation = false;
-let tempoInizioRicercaAntenna = null;
-let ricercaManualeSuggerita = false;
+let tempoInizioRicercaAntenna = null; 
+let ricercaManualeSuggerita = false;  
 let tempoInizioDashboard = Date.now();
 let ultimaLat = 0;
 let ultimaLon = 0;
@@ -226,86 +226,117 @@ function updateMiniChart(key, val) {
 }
 
 function openModal(sensor) {
-    // 1. Apri il modale
     q('chartModal').style.display = 'flex';
-    
     const cfg = sensorCfg[sensor];
-    // Se i dati non esistono, esci e non fare danni
     if (!cfg || !miniCharts[sensor]) return;
-
     q('modalTitle').innerText = "Storico: " + cfg.id;
     const ctx = q('bigChartCanvas').getContext('2d');
-
-    // 2. Distruggi il vecchio grafico se esiste (evita sovrapposizioni)
-    if (bigChart) { bigChart.destroy(); bigChart = null; }
-
-    // 3. CREAZIONE GRAFICO (Correzione Assi e Spazi)
+    if (bigChart) bigChart.destroy();
     bigChart = new Chart(ctx, {
         type: 'line',
         data: {
             labels: miniCharts[sensor].data.labels,
             datasets: [{
-                label: cfg.id,
-                data: miniCharts[sensor].data.datasets[0].data,
-                borderColor: cfg.c,
-                backgroundColor: cfg.c + '33',
-                fill: true,
-                tension: 0.3
+                label: cfg.id, data: miniCharts[sensor].data.datasets[0].data,
+                borderColor: cfg.c, backgroundColor: cfg.c + '33', fill: true, tension: 0.3, pointRadius: 2
             }]
         },
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            layout: { padding: { left: 55, right: 25, top: 10, bottom: 40 } },
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { labels: { color: '#ffffff' } } },
             scales: {
-                x: { ticks: { color: '#ffffff' }, grid: { color: 'rgba(255,255,255,0.1)' } },
-                y: { ticks: { color: '#ffffff' }, grid: { color: 'rgba(255,255,255,0.1)' } }
-            },
-            plugins: { legend: { labels: { color: '#ffffff' } } }
+                x: { ticks: { color: '#ffffff' }, grid: { color: 'rgba(148,163,184,0.35)' } },
+                y: { ticks: { color: '#ffffff' }, grid: { color: 'rgba(148,163,184,0.35)' } }
+            }
         }
-    });
-
-    // 4. GESTIONE TABELLA (Correzione 2 Colonne)
-    const thead = q('modalTableHead'); 
-    const tbody = q('modalTableBody');
-
-    // Forza l'intestazione a sole 2 colonne: Ora e Nome Sensore
-    thead.innerHTML = `<tr><th style="color:#38bdf8">Ora</th><th style="color:#38bdf8">${cfg.id}</th></tr>`;
-    
-    // Pulisce tutto il corpo della tabella
-    tbody.innerHTML = ""; 
-
-    const orari = miniCharts[sensor].data.labels;
-    const valori = miniCharts[sensor].data.datasets[0].data;
-
-    // Crea le righe: mette solo Ora e Valore
-    orari.forEach((ora, index) => {
-        const row = document.createElement('tr');
-        row.innerHTML = `<td>${ora}</td><td style="font-weight:bold">${valori[index]}</td>`;
-        tbody.appendChild(row);
     });
 }
 
 function eseguiStampaEffettiva() {
-    const elTitolo = q('modalTitle');
-    const elGps = q('gpsRaw');
+    const titoloModale = document.getElementById('modalTitle').innerText;
+    // Puliamo il titolo: togliamo "Storico: " per avere solo il nome del sensore
+    const nomeSensore = titoloModale.replace('Storico: ', '').toUpperCase();
     
-    // Prendiamo solo il colore e i dati del sensore che stiamo visualizzando ora
-    const coloreCorrente = bigChart.data.datasets[0].borderColor;
-    const nomeSensore = elTitolo ? elTitolo.innerText.replace("Storico: ", "") : "Dato";
+    const chartProprio = Chart.getChart("bigChartCanvas");
 
-    const reportData = {
-        n: elTitolo ? elTitolo.innerText : "Analisi Dati",
-        l: bigChart.data.labels, // Invia le ore
-        v: bigChart.data.datasets[0].data, // Invia SOLO i valori del sensore attivo
-        g: elGps ? elGps.innerText : "--",
-        c: coloreCorrente,
-        sensorName: nomeSensore // Specifichiamo il nome per la colonna singola
-    };
+    // 1. SET COLORI NERI (PER IL PDF)
+    const colorOriginale = chartProprio.options.scales.x.ticks.color;
+    const gridOriginale = chartProprio.options.scales.x.grid.color;
 
-    const json = JSON.stringify(reportData);
-    const encoded = btoa(unescape(encodeURIComponent(json)));
-    window.open('print.html?data=' + encoded, '_blank');
+    chartProprio.options.scales.x.ticks.color = 'black';
+    chartProprio.options.scales.y.ticks.color = 'black';
+    chartProprio.options.scales.x.grid.color = 'rgba(0,0,0,0.1)';
+    chartProprio.options.scales.y.grid.color = 'rgba(0,0,0,0.1)';
+    chartProprio.update('none');
+
+    const imgData = chartProprio.canvas.toDataURL('image/png');
+
+    // RIPRISTINO DASHBOARD
+    chartProprio.options.scales.x.ticks.color = colorOriginale;
+    chartProprio.options.scales.y.ticks.color = colorOriginale;
+    chartProprio.options.scales.x.grid.color = gridOriginale;
+    chartProprio.options.scales.y.grid.color = gridOriginale;
+    chartProprio.update('none');
+
+    // 2. IFRAME NASCOSTO
+    let iframe = document.getElementById('printFrame');
+    if (!iframe) {
+        iframe = document.createElement('iframe');
+        iframe.id = 'printFrame';
+        iframe.style.position = 'fixed';
+        iframe.style.visibility = 'hidden';
+        document.body.appendChild(iframe);
+    }
+
+    const doc = iframe.contentWindow.document;
+
+    doc.open();
+    doc.write(`
+        <html>
+            <head>
+                <style>
+                    @page { size: A4 landscape; margin: 10mm; }
+                    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background: white; color: black; }
+                    .header { 
+                        display: flex; 
+                        justify-content: space-between; 
+                        align-items: center; 
+                        border-bottom: 2px solid #38bdf8; 
+                        padding-bottom: 10px;
+                        margin-bottom: 20px;
+                    }
+                    .header h1 { margin: 0; font-size: 22pt; letter-spacing: 1px; }
+                    .header h2 { margin: 0; font-size: 16pt; color: #333; }
+                    .chart-box { text-align: center; width: 100%; }
+                    img { width: 100%; height: auto; max-height: 155mm; object-fit: contain; }
+                    .footer { 
+                        position: fixed; bottom: 0; width: 100%;
+                        border-top: 1px solid #eee; padding-top: 5px;
+                        font-size: 10pt; color: #666; display: flex; justify-content: space-between;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>REPORT MONITORAGGIO</h1>
+                    <h2>SENSORE: ${nomeSensore}</h2>
+                </div>
+                <div class="chart-box">
+                    <img src="${imgData}">
+                </div>
+                <div class="footer">
+                    <span>Generato il: ${new Date().toLocaleString()}</span>
+                    <span>Stazione Meteo ESP32 - Dashboard IoT</span>
+                </div>
+            </body>
+        </html>
+    `);
+    doc.close();
+
+    setTimeout(() => {
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+    }, 600);
 }
 
 async function esportaCSV() {
@@ -340,6 +371,8 @@ async function esportaCSV() {
         link.click();
     } catch (e) { alert("Errore download."); }
 }
+
+
 
 function initCharts() {
     Object.keys(sensorCfg).forEach(k => {
@@ -377,11 +410,11 @@ window.addEventListener('resize', () => {
 
 async function aggiornaPosizioneGPS() {
     const urlGPS = "https://api.thingspeak.com/channels/3236443/feeds/last.json?api_key=PFSWSJSXRCV4C3I3";
-
+    
     try {
         const response = await fetch(urlGPS);
         const data = await response.json();
-
+        
         if (data.field1 && data.field2) {
             const lat = parseFloat(data.field1);
             const lon = parseFloat(data.field2);
@@ -393,14 +426,14 @@ async function aggiornaPosizioneGPS() {
                 if (q('localitaNome')) q('localitaNome').innerHTML = "ATTESA SEGNALE GPS...";
                 if (q('gpsCoordinate')) q('gpsCoordinate').innerHTML = "RICERCA SATELLITI...";
                 if (q('gpsRaw')) q('gpsRaw').innerHTML = "NO FIX";
-                return;
+                return; 
             }
 
             // SE IL FIX C'È, RECUPERA L'INDIRIZZO
             const urlReverse = `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/reverseGeocode?f=pjson&location=${lon},${lat}`;
             const resAddr = await fetch(urlReverse);
             const dataAddr = await resAddr.json();
-
+            
             if (dataAddr && dataAddr.address) {
                 const indirizzo = dataAddr.address.Match_addr;
                 if (q('localitaNome')) q('localitaNome').innerHTML = indirizzo.toUpperCase();
@@ -416,25 +449,25 @@ async function aggiornaPosizioneGPS() {
             }
 
             // Salva la posizione buona in memoria (inclusa altitudine se vuoi)
-            localStorage.setItem('ultimaPosizioneValida', JSON.stringify({ lat, lon, alt }));
+            localStorage.setItem('ultimaPosizioneValida', JSON.stringify({lat, lon, alt}));
         }
-    } catch (err) {
-        console.log("Errore aggiornamento GPS");
+    } catch (err) { 
+        console.log("Errore aggiornamento GPS"); 
     }
 }
 
 function aggiornaOrologio() {
     const oraAttuale = new Date();
-
+    
     // Prende ore, minuti e secondi
     const ore = String(oraAttuale.getHours()).padStart(2, '0');
     const minuti = String(oraAttuale.getMinutes()).padStart(2, '0');
     const secondi = String(oraAttuale.getSeconds()).padStart(2, '0');
-
+    
     // Cerca l'elemento con ID 'clock' o 'orologio'
     // Se nel tuo HTML l'id è diverso, cambialo qui sotto
     const displayOrologio = document.getElementById('orologio') || document.getElementById('clock');
-
+    
     if (displayOrologio) {
         displayOrologio.innerHTML = `${ore}:${minuti}:${secondi}`;
     }
@@ -449,9 +482,9 @@ aggiornaOrologio();
 document.addEventListener('DOMContentLoaded', async () => {
     initCharts();
     caricaPreferenzeUtente();
-    applyGPSData();
+    applyGPSData(); 
     await fetchSensorData();
-    await aggiornaPosizioneGPS();
+    await aggiornaPosizioneGPS(); 
     setInterval(fetchSensorData, getSavedInterval());
     setInterval(aggiornaPosizioneGPS, 20000); // Aggiorna GPS ogni 20 secondi
 });

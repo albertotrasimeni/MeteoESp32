@@ -253,47 +253,30 @@ body {
         display: none;
     }
 }
-
-/* --- STAMPA --- */
-@media print {
-    @page {
-        size: portrait;
-        margin: 1.5cm;
-    }
-
-    body>*:not(#chartModal) {
-        display: none !important;
-    }
-
-    body {
-        background: white !important;
-        padding: 0;
-        margin: 0;
-    }
-
-    #chartModal {
-        display: block !important;
-        position: relative !important;
-        visibility: visible !important;
-        background: white !important;
-        width: 100% !important;
-        border: none !important;
-    }
-
-    .modal-content {
-        background: white !important;
-        border: none !important;
-        width: 100% !important;
-        padding: 0 !important;
-    }
-
-    #bigChartCanvas,
-    .close-btn,
-    .no-print,
-    button {
-        display: none !important;
-    }
+/* Sostituisci i tuoi blocchi con questo */
+#print-section {
+    position: absolute;
+    left: -9999px; /* Sposta la sezione fuori dal monitor */
+    top: 0;
+    width: 210mm; /* Larghezza A4 */
+    background: white !important;
+    padding: 40px;
+    visibility: visible !important;
+    display: block !important; /* IMPORTANTE: deve essere block per essere letto */
 }
+
+#print-section * {
+    color: black !important; /* Testo nero su sfondo bianco */
+}
+
+#print-section img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 20px auto;
+    border: 1px solid #eee;
+}
+
 
 /* =====================================================
     OVERRIDE FINALE – FINE TUNING
@@ -332,17 +315,18 @@ body {
     height: 68px !important;
 }
 
-@media (max-width: 1200px),
-       (max-width: 1100px),
-       (max-width: 900px) {
+#print-section {
+    position: absolute;
+    left: -10000px; 
+    top: 0;
+    width: 210mm;
+    background: white !important;
+    display: block !important;
+    visibility: visible !important;
+}
 
-    .grid-container {
-        grid-template-columns: repeat(3, 1fr) !important;
-    }
-
-    .card {
-        height: 250px !important;
-    }
+#print-section * {
+    color: black !important;
 }
 
 /*=====================================================
@@ -403,35 +387,18 @@ body {
 }
 
 /* Fix per il testo della località (Azzurro e Grassetto) */
-/* Fix per il testo della località (Ridotto per evitare espansione card) */
-/* Fix per il testo della località (Corretto con selettore e parentesi) */
-
-/* Fix definitivo per il testo della località */
-/* ELIMINA LE VECCHIE VERSIONI E INCOLLA QUESTA */
-/* FORZATURA TAGLIO INDIRIZZO */
-/* Testo località leggermente più grande e leggibile */
+/* Fix per il testo della località - RIDOTTO PER NON ALLARGARE LA CARD */
 #localitaNome {
     color: #38bdf8 !important;
-    font-size: 1.05rem !important; /* Aumentato da 0.85rem a 1.05rem */
+    font-size: 1.05rem !important; /* Dimensione media: né troppo grande, né troppo piccola */
     font-weight: bold !important;
-    text-align: center !important;
     margin-top: 5px !important;
-    line-height: 1.2 !important;
-    word-wrap: break-word !important;
-    
-    /* Manteniamo il blocco per la sicurezza del layout */
+    margin-bottom: 5px !important;
     display: block !important;
-    max-height: 2.5em !important; 
-    overflow: hidden !important;
-}
-
-/* Regoliamo lo spazio inferiore per non far uscire i dati */
-#gpsRaw {
-    display: flex !important;
-    justify-content: center !important;
-    margin-top: 15px !important; /* Spazio ridotto per accogliere il testo più grande sopra */
-    font-size: 0.8rem !important;
-}
+    word-wrap: break-word !important;
+    line-height: 1.1 !important;   /* Mantiene le righe compatte */
+    text-transform: uppercase !important;
+}/* Evita che il titolo della card copra la barra di ricerca */
 #block-gps .card-header {
     position: relative !important;
     overflow: visible !important;
@@ -455,8 +422,8 @@ body {
     justify-content: center !important;
     width: 100% !important;
     
-    /* Aumentato a 55px per portarlo quasi sul bordo inferiore */
-    margin-top: 55px !important; 
+    /* Ridotto da 55px per compensare il testo più grande sopra */
+    margin-top: 40px !important; 
     
     /* Lo rendiamo un po' più piccolo per farlo sembrare una riga di stato */
     font-size: 0.8rem !important;

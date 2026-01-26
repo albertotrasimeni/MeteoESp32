@@ -33,7 +33,6 @@
             position: relative;
         }
 
-        /* Ottimizzazione Grid per Mobile: da 4 colonne a 2 o 1 su schermi piccoli */
         .summary-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
@@ -97,11 +96,9 @@
             position: relative;
         }
 
-        /* Ottimizzazione Tabella per Mobile (Scroll orizzontale se necessario) */
         .table-container {
             width: 100%;
             overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
             margin-top: 30px;
         }
 
@@ -136,7 +133,6 @@
             color: var(--accent);
             padding: 8px;
             border-radius: 6px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
         }
 
         @media print {
@@ -150,10 +146,6 @@
 
             .chart-card {
                 height: 280px;
-            }
-
-            .close-window {
-                display: none !important;
             }
 
             .table-container {
@@ -182,7 +174,7 @@
 
     <header>
         <div>
-            <h1 id="reportTitle" style="margin:0; color: var(--accent); font-size: 1.5rem;">REPORT METEO ESP32</h1>
+            <h1 style="margin:0; color: var(--accent); font-size: 1.5rem;">REPORT METEO ESP32</h1>
             <p id="genDate" style="color:#64748b; margin-top:5px; font-size: 0.9rem;"></p>
         </div>
         <div style="font-size: 0.9rem;">
@@ -192,11 +184,10 @@
     </header>
 
     <div class="summary-grid" id="summaryBox"></div>
-
     <div class="report-grid" id="chartsGrid"></div>
 
     <div class="table-container">
-        <table>
+        <table id="reportTable">
             <thead>
                 <tr>
                     <th>Ora</th>
@@ -215,99 +206,126 @@
     </div>
 
     <script>
-        // 1. Recupero dati dall'URL (Metodo robusto per Firefox e PC locale)
-        const urlParams = new URLSearchParams(window.location.search);
-        const dataEncoded = urlParams.get('data');
-        let data = null;
-
-        if (dataEncoded) {
-            try {
-                // Decodifica super-compatibile per gestire simboli come °C e accenti
-                data = JSON.parse(decodeURIComponent(escape(atob(dataEncoded))));
-            } catch (e) {
-                console.error("Errore decodifica URL:", e);
-                // Fallback se la decodifica speciale fallisce
-                try { data = JSON.parse(atob(dataEncoded)); } catch (e2) { }
+        document.addEventListener('DOMContentLoaded', function () {
+            const rawData = localStorage.getItem('printData');
+            if (!rawData) {
+                document.body.innerHTML = "<h1 style='text-align:center; margin-top:50px;'>Errore: Nessun dato trovato.</h1>";
+                return;
             }
-        }
 
-        // 2. Se i dati sono validi, costruiamo il report
-        if (data && data.l) {
-            document.getElementById('genDate').textContent = "Documento generato il: " + new Date().toLocaleString('it-IT');
+            const data = JSON.parse(rawData);
+            document.getElementById('genDate').innerText = "Generato il: " + new Date().toLocaleString();
 
-            // Aggiorniamo il titolo del report col nome del sensore
-            const reportTitle = document.getElementById('reportTitle');
-            if (reportTitle) reportTitle.textContent = "ANALISI: " + data.n;
+            const allSets = [
+                { k: 'temp', n: 'Temperatura', c: '#ef4444' },
+                { k: 'hum', n: 'Umidità', c: '#3b82f6' },
+                { k: 'press_mb', n: 'Pressione', c: '#f59e0b' },
+                { k: 'iaq', n: 'Qualità Aria', c: '#10b981' },
+                { k: 'co2', n: 'CO2', c: '#a855f7' },
+                { k: 'pm25', n: 'PM2.5', c: '#64748b' },
+                { k: 'uv', n: 'Indice UV', c: '#fbbf24' },
+                { k: 'wind', n: 'Vento', c: '#0ea5e9' }
+            ];
+            // 2. FILTRAGGIO: Se data.soloQuesto esiste ed è valido, prendiamo solo quello. 
+            // Altrimenti (se apri la stampa generale) li prendiamo tutti.
+            let sets = (data.soloQuesto && data.soloQuesto !== "")
+                ? allSets.filter(s => s.k === data.soloQuesto)
+                : allSets;
 
-            // Box riassuntivo per il GPS
+            // 3. Controllo di sicurezza: se il filtro svuota l'array per errore, mostra tutto
+            if (sets.length === 0) sets = allSets;
+            // Funzione utility per i valori
+            function safeVal(arr, idx) {
+                return (arr && arr[idx] !== undefined) ? arr[idx] : '--';
+            }
+
+            // 1. Filtro sensore singolo
+            // if (data.soloQuesto) {
+            //   sets = sets.filter(item => item.k === data.soloQuesto);
+            //  }
+
+            // 2. Box Riassuntivi
             const summaryBox = document.getElementById('summaryBox');
-            if (summaryBox) {
-                summaryBox.innerHTML = `
-                <div class="summary-item" style="grid-column: span 4;">
-                    <strong>Coordinate GPS Rilevate</strong>
-                    <div style="font-size:1.2rem; margin-top:8px; color:#0ea5e9;">${data.g || '--'}</div>
-                </div>`;
-            }
+            summaryBox.innerHTML = '';
+            sets.forEach(s => {
+                const arr = data[s.k] || [];
+                const last = arr.length ? arr[arr.length - 1] : '--';
+                const item = document.createElement('div');
+                item.className = 'summary-item';
+                item.innerHTML = `
+                    <strong style="color:${s.c}">${s.n}</strong>
+                    <div style="font-size:1.4rem; font-weight:bold; margin-top:8px;">${last}</div>
+                `;
+                summaryBox.appendChild(item);
+            });
 
-            // Prepariamo l'area del grafico
+            // 3. Tabella Dati
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+            data.labels.forEach((label, i) => {
+                const row = `<tr>
+                    <td>${label || ''}</td>
+                    <td>${safeVal(data.temp, i)}</td>
+                    <td>${safeVal(data.hum, i)}</td>
+                    <td>${safeVal(data.press_mb, i)}</td>
+                    <td>${safeVal(data.iaq, i)}</td>
+                    <td>${safeVal(data.co2, i)}</td>
+                    <td>${safeVal(data.pm25, i)}</td>
+                    <td>${safeVal(data.uv, i)}</td>
+                    <td>${safeVal(data.wind, i)}</td>
+                </tr>`;
+                tbody.insertAdjacentHTML('beforeend', row);
+            });
+
+            // 4. Grafici
             const chartsGrid = document.getElementById('chartsGrid');
-            const card = document.createElement('div');
-            card.className = 'chart-card';
-            card.style.height = "450px";
-            card.innerHTML = `<div class="chart-wrapper"><canvas id="mainChart"></canvas></div>`;
-            chartsGrid.appendChild(card);
+            const chartPromises = sets.map((s, idx) => {
+                return new Promise(resolve => {
+                    const card = document.createElement('div');
+                    card.className = 'chart-card';
+                    card.innerHTML = `<h4>Andamento ${s.n}</h4><div class="chart-wrapper"><canvas id="chart_${s.k}"></canvas></div>`;
+                    chartsGrid.appendChild(card);
 
-            // 3. Disegniamo il grafico con SCALE NERE (Fondamentale per la stampa)
-            setTimeout(() => {
-                const ctx = document.getElementById('mainChart').getContext('2d');
-                new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: data.l,
-                        // Dentro print.html
-                        datasets: [{
-                            label: data.n,
-                            data: data.v,
-                            borderColor: data.c || '#0ea5e9', // Usa il colore del sensore passato
-                            backgroundColor: (data.c || '#0ea5e9') + '33',
-                            fill: true
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        layout: {
-                            padding: { left: 50, right: 20, top: 20, bottom: 50 }
-                        },
-                        scales: {
-                            x: {
-                                ticks: { color: '#000000', font: { size: 12, weight: 'bold' } },
-                                grid: { color: 'rgba(0, 0, 0, 0.1)' }
-                            },
-                            y: {
-                                ticks: { color: '#000000', font: { size: 12, weight: 'bold' } },
-                                grid: { color: 'rgba(0, 0, 0, 0.1)' }
-                            }
-                        },
-                        plugins: {
-                            legend: { labels: { color: '#000000' } }
+                    setTimeout(() => {
+                        const canvasEl = document.getElementById(`chart_${s.k}`);
+                        if (canvasEl) {
+                            new Chart(canvasEl.getContext('2d'), {
+                                type: 'line',
+                                data: {
+                                    labels: data.labels,
+                                    datasets: [{
+                                        label: s.n,
+                                        data: (data[s.k] || []),
+                                        borderColor: s.c,
+                                        fill: true,
+                                        backgroundColor: s.c + '10',
+                                        tension: 0.3
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: { legend: { display: false } },
+                                    scales: {
+                                        x: { ticks: { font: { size: 10 }, maxRotation: 45, maxTicksLimit: 10 }, grid: { display: false } },
+                                        y: { ticks: { font: { size: 10 } }, grid: { color: 'rgba(0,0,0,0.05)' } }
+                                    }
+                                }
+                            });
                         }
-                    }, // <--- LA VIRGOLA CHE MANCAVA È QUI
+                        resolve(true);
+                    }, idx * 80);
                 });
+            });
 
-                // 4. Lancio automatico della stampa dopo 1 secondo
-                setTimeout(() => { window.print(); }, 1000);
-            }, 100);
-
-        } else {
-            // Messaggio di errore se non arrivano dati
-            document.body.innerHTML = `
-            <div style="text-align:center; padding:50px; font-family:sans-serif;">
-                <h1>⚠️ Dati non ricevuti</h1>
-                <p>Torna alla dashboard, apri un sensore e clicca su 'Stampa Record'.</p>
-                <small>Assicurati di usare l'ultima versione di script.js</small>
-            </div>`;
-        }
+            // 5. Gestione Stampa Automatica
+            Promise.all(chartPromises).then(() => {
+                if (localStorage.getItem('autoPrint') === '1') {
+                    localStorage.removeItem('autoPrint');
+                    setTimeout(() => { window.print(); }, 1500);
+                }
+            });
+        });
     </script>
 </body>
 

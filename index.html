@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
 </head>
 
 <body>
@@ -178,7 +179,7 @@
                 <h2 id="modalTitle" style="color:white; text-align:center;"></h2>
                 <div id="modalCoords" style="color:white; text-align:center; font-size:14px; margin-bottom:10px;">
                 </div>
-                <div style="position: relative; height: 350px; width: 100%; margin-bottom: 20px;">
+                <div class="chart-container" style="position:relative; height:400px;">
                     <canvas id="bigChartCanvas"></canvas>
                 </div>
                 <div style="text-align:center; margin-top:20px;" class="no-print">
@@ -190,7 +191,11 @@
             </div>
         </div>
 
+        <div id="print-section">
+            <h2 style="text-align:center; color:black;">Report Dettagliato Grafico</h2>
+            <div id="print-canvas-container"></div>
+            <p id="print-footer" style="text-align:center; color:black; margin-top:20px;"></p>
+        </div>
         <script src="script.js"></script>
 </body>
-
 </html>
